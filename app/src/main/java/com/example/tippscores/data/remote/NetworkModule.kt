@@ -1,9 +1,9 @@
 package com.example.tippscores.data.remote
 
+import com.google.gson.GsonBuilder
 import com.google.gson.JsonDeserializationContext
 import com.google.gson.JsonDeserializer
 import com.google.gson.JsonElement
-import com.google.gson.GsonBuilder
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -14,7 +14,7 @@ import retrofit2.http.Header
 import retrofit2.http.Query
 import java.lang.reflect.Type
 
-// --- STATPAL V2 JSON DTO MODELL ---
+// --- STATPAL V2 DTO STRUCT ---
 
 data class StatpalTeamInfo(
     @SerializedName("id") val id: String?,
@@ -24,7 +24,7 @@ data class StatpalTeamInfo(
 
 data class StatpalMatchItem(
     @SerializedName("main_id") val mainId: String?,
-    @SerializedName("status") val status: String?, // "FT", "72'", "18:30"
+    @SerializedName("status") val status: String?,
     @SerializedName("date") val date: String?,
     @SerializedName("time") val time: String?,
     @SerializedName("home") val home: StatpalTeamInfo?,
@@ -43,12 +43,10 @@ data class StatpalDailyData(
     @SerializedName("league") val leagues: List<StatpalLeagueItem>?
 )
 
-// Burkoló osztály a dinamikus matches_DD_MM_YYYY kulcs kezelésére
 data class StatpalDailyResponseDto(
     val data: StatpalDailyData?
 )
 
-// Dinamikus Gson Deserializer a "matches_15_12_2025" típusú kulcsok kibontásához
 class StatpalDailyDeserializer : JsonDeserializer<StatpalDailyResponseDto> {
     override fun deserialize(
         json: JsonElement,
@@ -56,7 +54,6 @@ class StatpalDailyDeserializer : JsonDeserializer<StatpalDailyResponseDto> {
         context: JsonDeserializationContext
     ): StatpalDailyResponseDto {
         val jsonObject = json.asJsonObject
-        // Megkeressük az első olyan kulcsot, ami matches_-el kezdődik, vagy a live_matches-t
         val key = jsonObject.keySet().firstOrNull { it.startsWith("matches_") || it == "live_matches" }
         return if (key != null) {
             val dailyData = context.deserialize<StatpalDailyData>(jsonObject.get(key), StatpalDailyData::class.java)
@@ -68,25 +65,24 @@ class StatpalDailyDeserializer : JsonDeserializer<StatpalDailyResponseDto> {
 }
 
 interface StatpalApiService {
-    // ÉLŐ MECCSEK (MAI NAP)
     @GET("api/v2/soccer/matches/live")
     suspend fun getLiveMatches(
         @Query("access_key") accessKey: String
     ): StatpalDailyResponseDto
 
-    // ELMÚLT ÉS KÖVETKEZŐ MECCSEK (-7 ÉS +7 NAP KÖZÖTT)
     @GET("api/v2/soccer/matches/daily")
     suspend fun getDailyMatches(
-        @Query("offset") offset: Int, // -7 ... 7
+        @Query("offset") offset: Int,
         @Query("access_key") accessKey: String
     ): StatpalDailyResponseDto
 }
 
 // --- HIGHLIGHTLY DTO STRUCT (RapidAPI) ---
+
 data class HighlightlyItemDto(
-    val match_id: String?,
-    val match_name: String?,
-    val url: String?
+    @SerializedName("match_id") val match_id: String?,
+    @SerializedName("match_name") val match_name: String?,
+    @SerializedName("video_url") val video_url: String?
 )
 
 interface HighlightlyApiService {
@@ -97,7 +93,8 @@ interface HighlightlyApiService {
     ): List<HighlightlyItemDto>
 }
 
-// --- RETROFIT KLIENSEK ---
+// --- RETROFIT CLIENTS ---
+
 object NetworkModule {
 
     private const val STATPAL_BASE_URL = "https://statpal.io/"
