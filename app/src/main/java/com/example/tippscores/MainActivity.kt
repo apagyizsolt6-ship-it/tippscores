@@ -34,13 +34,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val matches by viewModel.matches.collectAsState()
+            val isLoading by viewModel.isLoading.collectAsState()
+            val errorMessage by viewModel.errorMessage.collectAsState()
             val statpalKey by viewModel.statpalKey.collectAsState()
             val highlightlyKey by viewModel.highlightlyKey.collectAsState()
 
             MatchListScreen(
                 matches = matches,
+                errorMessage = errorMessage,
+                isLoading = isLoading,
                 statpalKey = statpalKey,
                 highlightlyKey = highlightlyKey,
+                onRefresh = { viewModel.refreshData() },
                 onSaveKeys = { sKey, hKey ->
                     viewModel.saveKeysAndRefresh(sKey, hKey)
                 },
