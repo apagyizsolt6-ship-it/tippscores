@@ -8,13 +8,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.local.AppDatabase
 import com.example.tippscores.data.repository.MatchRepository
 import com.example.tippscores.ui.screens.MatchListScreen
 import com.example.tippscores.ui.viewmodel.MatchViewModel
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -25,6 +23,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MatchViewModel by viewModels {
         object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
                 return MatchViewModel(repository, apiPreferences) as T
             }
         }
@@ -35,16 +34,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val matches by viewModel.matches.collectAsState()
+            val statpalKey by viewModel.statpalKey.collectAsState()
+            val highlightlyKey by viewModel.highlightlyKey.collectAsState()
 
             MatchListScreen(
                 matches = matches,
-                statpalKey = apiPreferences.statpalApiKey,
-                highlightlyKey = apiPreferences.highlightlyApiKey,
-                onSaveKeys = { statpalKey, highlightlyKey ->
-                    viewModel.saveKeysAndRefresh(statpalKey, highlightlyKey)
+                statpalKey = statpalKey,
+                highlightlyKey = highlightlyKey,
+                onSaveKeys = { sKey, hKey ->
+                    viewModel.saveKeysAndRefresh(sKey, hKey)
                 },
                 onMatchClick = { matchId ->
-                    // Meccs megnyitása
+                    // Meccs részletei
                 }
             )
         }
