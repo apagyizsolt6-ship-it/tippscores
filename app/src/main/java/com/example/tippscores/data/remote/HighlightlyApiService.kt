@@ -2,12 +2,15 @@ package com.example.tippscores.data.remote
 
 import retrofit2.http.GET
 import retrofit2.http.Header
-import retrofit2.http.Query
+
+data class HighlightlyDto(
+    val match_id: String,
+    val video_url: String?
+)
 
 interface HighlightlyApiService {
     @GET("football-highlights")
     suspend fun getHighlights(
-        @Header("X-RapidAPI-Key") apiKey: String,
-        @Query("match_id") matchId: String
-    ): List<Any> // Cseréld ki a pontos Highlightly válaszmodellre
+        @Header("X-RapidAPI-Key") apiKey: String
+    ): List<HighlightlyDto>
 }
