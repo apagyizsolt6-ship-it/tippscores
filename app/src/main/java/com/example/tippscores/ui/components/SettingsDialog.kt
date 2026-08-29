@@ -15,8 +15,8 @@ fun SettingsDialog(
     onDismiss: () -> Unit,
     onSave: (statpalKey: String, highlightlyKey: String) -> Unit
 ) {
-    var statpalKey by remember { mutableStateOf(initialStatpalKey) }
-    var highlightlyKey by remember { mutableStateOf(initialHighlightlyKey) }
+    var statpalKey by remember(initialStatpalKey) { mutableStateOf(initialStatpalKey) }
+    var highlightlyKey by remember(initialHighlightlyKey) { mutableStateOf(initialHighlightlyKey) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -41,7 +41,9 @@ fun SettingsDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(statpalKey, highlightlyKey) }) {
+            Button(onClick = { 
+                onSave(statpalKey.trim(), highlightlyKey.trim()) 
+            }) {
                 Text("Mentés & Frissítés")
             }
         },
