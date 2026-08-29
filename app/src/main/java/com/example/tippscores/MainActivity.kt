@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                     viewModel.refreshData()
                 },
 
-                onOffsetSelected = { offset ->
+                onDateSelected = { offset ->
                     viewModel.selectOffset(offset)
                 },
 
