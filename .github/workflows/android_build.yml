@@ -21,18 +21,16 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    # 1. GENERÁLJUK A HIÁNYZÓ GRADLE WRAPPER JAR FÁJLT
+    # FIXÁLT 8.5-ÖS GRADLE VERZIÓ GENERÁLÁSA (A HIBA ELKERÜLÉSÉRE)
     - name: Setup Gradle Wrapper
-      run: gradle wrapper
+      run: gradle wrapper --gradle-version 8.5
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    # 2. APK FORDÍTÁS
     - name: Build APK with Gradle
       run: ./gradlew assembleDebug --stacktrace
 
-    # 3. KÉSZ APK LETÖLTÉSE
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
