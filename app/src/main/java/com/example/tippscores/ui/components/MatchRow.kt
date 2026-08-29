@@ -7,18 +7,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,134 +34,450 @@ fun MatchRow(
     match: Match,
     onMatchClick: (String) -> Unit
 ) {
-    val accent = when {
-        match.isLive -> Color(0xFFEF4444)
-        match.status == "Vége" || match.status == "Hosszabbítás" -> Color(0xFF16A34A)
-        else -> Color(0xFF2563EB)
-    }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .clickable { onMatchClick(match.id) },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (match.isLive) Color(0xFFFFF7F7) else Color.White
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier
+    val status =
+        translateStatus(
+            match.status,
+            match.isLive
+        )
+
+    val statusColor =
+        when {
+
+            match.isLive ->
+                Color(0xFFDC2626)
+
+            match.status.uppercase() == "FT" ->
+                Color(0xFF16A34A)
+
+            match.status.uppercase() == "AET" ->
+                Color(0xFFEA580C)
+
+            else ->
+                Color(0xFF64748B)
+        }
+
+    Surface(
+        modifier =
+            Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.width(48.dp)
+                .clickable {
+                    onMatchClick(
+                        match.id
+                    )
+                },
+
+        color =
+            if (match.isLive)
+                Color(0xFFFFF7F7)
+            else
+                Color.White
+    ) {
+
+        Column {
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 12.dp,
+                            vertical = 8.dp
+                        ),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.StarBorder,
-                    contentDescription = "Kedvenc",
-                    tint = Color(0xFF94A3B8),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.size(2.dp))
-                Surface(
-                    color = accent.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(6.dp)
+
+                // ==================================================
+                // CSILLAG + STÁTUSZ
+                // ==================================================
+
+                Column(
+                    modifier =
+                        Modifier.width(48.dp),
+
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = match.status,
-                        color = accent,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                    )
-                }
-            }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                TeamItem(name = match.homeTeam, logoUrl = match.homeTeamLogo)
-                Spacer(modifier = Modifier.size(5.dp))
-                TeamItem(name = match.awayTeam, logoUrl = match.awayTeamLogo)
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(horizontal = 6.dp)
-            ) {
-                Text(
-                    text = match.homeScore?.toString() ?: "–",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp,
-                    color = if (match.isLive) accent else Color(0xFF172033)
-                )
-                Text(
-                    text = match.awayScore?.toString() ?: "–",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp,
-                    color = if (match.isLive) accent else Color(0xFF172033)
-                )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.width(28.dp)
-            ) {
-                if (match.hasVideoHighlight) {
                     Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = "Videó",
-                        tint = Color(0xFF7C3AED),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                        imageVector =
+                            Icons.Outlined.Star,
 
-                if (match.tipPrediction != null) {
+                        contentDescription =
+                            "Kedvenc",
+
+                        tint =
+                            Color(0xFF94A3B8),
+
+                        modifier =
+                            Modifier.size(18.dp)
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(3.dp)
+                    )
+
                     Surface(
-                        color = Color(0xFFDCFCE7),
-                        shape = RoundedCornerShape(5.dp),
-                        modifier = Modifier.padding(top = 2.dp)
+                        shape =
+                            RoundedCornerShape(5.dp),
+
+                        color =
+                            if (match.isLive)
+                                Color(0xFFFFE4E6)
+                            else
+                                Color(0xFFF1F5F9)
                     ) {
+
                         Text(
-                            text = "${match.tipConfidence ?: 0}%",
-                            color = Color(0xFF166534),
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 2.dp)
+                            text = status,
+
+                            color =
+                                statusColor,
+
+                            fontSize = 10.sp,
+
+                            fontWeight =
+                                if (match.isLive)
+                                    FontWeight.Bold
+                                else
+                                    FontWeight.Medium,
+
+                            modifier =
+                                Modifier.padding(
+                                    horizontal = 5.dp,
+                                    vertical = 2.dp
+                                )
                         )
                     }
                 }
+
+                Spacer(
+                    modifier =
+                        Modifier.width(8.dp)
+                )
+
+                // ==================================================
+                // CSAPATOK
+                // ==================================================
+
+                Column(
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+
+                    TeamItem(
+                        name =
+                            match.homeTeam,
+
+                        logoUrl =
+                            match.homeTeamLogo
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(5.dp)
+                    )
+
+                    TeamItem(
+                        name =
+                            match.awayTeam,
+
+                        logoUrl =
+                            match.awayTeamLogo
+                    )
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.width(8.dp)
+                )
+
+                // ==================================================
+                // EREDMÉNY
+                // ==================================================
+
+                Column(
+                    modifier =
+                        Modifier.width(28.dp),
+
+                    horizontalAlignment =
+                        Alignment.End
+                ) {
+
+                    Text(
+                        text =
+                            match.homeScore
+                                ?.toString()
+                                ?: "-",
+
+                        color =
+                            if (match.isLive)
+                                Color(0xFFDC2626)
+                            else
+                                Color(0xFF111827),
+
+                        fontSize = 14.sp,
+
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        text =
+                            match.awayScore
+                                ?.toString()
+                                ?: "-",
+
+                        color =
+                            if (match.isLive)
+                                Color(0xFFDC2626)
+                            else
+                                Color(0xFF111827),
+
+                        fontSize = 14.sp,
+
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.width(10.dp)
+                )
+
+                // ==================================================
+                // EXTRA IKONOK
+                // ==================================================
+
+                Column(
+                    modifier =
+                        Modifier.width(28.dp),
+
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally,
+
+                    verticalArrangement =
+                        Arrangement.Center
+                ) {
+
+                    if (match.hasVideoHighlight) {
+
+                        Icon(
+                            imageVector =
+                                Icons.Filled.PlayArrow,
+
+                            contentDescription =
+                                "Videó",
+
+                            tint =
+                                Color(0xFF2563EB),
+
+                            modifier =
+                                Modifier.size(20.dp)
+                        )
+                    }
+
+                    if (
+                        match.tipPrediction != null &&
+                        match.tipConfidence != null
+                    ) {
+
+                        Surface(
+                            modifier =
+                                Modifier.padding(
+                                    top = 3.dp
+                                ),
+
+                            shape =
+                                RoundedCornerShape(5.dp),
+
+                            color =
+                                Color(0xFFDCFCE7)
+                        ) {
+
+                            Text(
+                                text =
+                                    "${match.tipConfidence}%",
+
+                                color =
+                                    Color(0xFF166534),
+
+                                fontSize = 8.sp,
+
+                                fontWeight =
+                                    FontWeight.Bold,
+
+                                modifier =
+                                    Modifier.padding(
+                                        horizontal = 3.dp,
+                                        vertical = 1.dp
+                                    )
+                            )
+                        }
+                    }
+                }
             }
+
+            HorizontalDivider(
+                modifier =
+                    Modifier.padding(
+                        horizontal = 10.dp
+                    ),
+
+                thickness = 0.5.dp,
+
+                color =
+                    Color(0xFFE2E8F0)
+            )
         }
     }
 }
 
 @Composable
-private fun TeamItem(name: String, logoUrl: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun TeamItem(
+    name: String,
+    logoUrl: String
+) {
+
+    Row(
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+
         if (logoUrl.isNotBlank()) {
+
             AsyncImage(
                 model = logoUrl,
+
                 contentDescription = name,
-                modifier = Modifier.size(18.dp)
+
+                modifier =
+                    Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(7.dp))
+
         } else {
-            Spacer(modifier = Modifier.width(25.dp))
+
+            Surface(
+                modifier =
+                    Modifier.size(20.dp),
+
+                shape =
+                    RoundedCornerShape(5.dp),
+
+                color =
+                    Color(0xFFEFF6FF)
+            ) {
+
+                Text(
+                    text = "⚽",
+
+                    fontSize = 10.sp
+                )
+            }
         }
+
+        Spacer(
+            modifier =
+                Modifier.width(8.dp)
+        )
 
         Text(
             text = name,
+
+            color =
+                Color(0xFF1E293B),
+
             fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            color = Color(0xFF172033)
+
+            fontWeight =
+                FontWeight.SemiBold,
+
+            maxLines = 1
         )
+    }
+}
+
+private fun translateStatus(
+    rawStatus: String,
+    isLive: Boolean
+): String {
+
+    if (isLive) {
+
+        return when {
+
+            rawStatus.matches(
+                Regex("^\\d{1,3}'$")
+            ) ->
+                rawStatus
+
+            rawStatus.equals(
+                "HT",
+                ignoreCase = true
+            ) ->
+                "SZÜNET"
+
+            rawStatus.equals(
+                "1H",
+                ignoreCase = true
+            ) ->
+                "ÉLŐ"
+
+            rawStatus.equals(
+                "2H",
+                ignoreCase = true
+            ) ->
+                "ÉLŐ"
+
+            else ->
+                "ÉLŐ"
+        }
+    }
+
+    return when (
+        rawStatus.trim().uppercase()
+    ) {
+
+        "FT" ->
+            "Vége"
+
+        "AET" ->
+            "Hossz."
+
+        "PEN" ->
+            "11-esek"
+
+        "POSTP." ->
+            "Elhalasztva"
+
+        "POSTP" ->
+            "Elhalasztva"
+
+        "POSTPONED" ->
+            "Elhalasztva"
+
+        "CANCELLED" ->
+            "Törölve"
+
+        "CANC" ->
+            "Törölve"
+
+        "ABD" ->
+            "Félbeszakadt"
+
+        "NS" ->
+            "Még nem kezdődött"
+
+        else ->
+            rawStatus
     }
 }
