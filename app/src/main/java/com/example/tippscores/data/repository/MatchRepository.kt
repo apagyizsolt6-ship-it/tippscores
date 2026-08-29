@@ -28,7 +28,6 @@ class MatchRepository(
         }
 
         try {
-            // Ha offset == 0, akkor a live meccseket kérjük, egyébként a daily végpontot offsettel
             val response = if (offset == 0) {
                 NetworkModule.statpalApi.getLiveMatches(statpalKey)
             } else {
@@ -71,8 +70,8 @@ class MatchRepository(
                             isLive = m.status != "FT" && m.status != "AET" && offset == 0,
                             tipPrediction = null,
                             tipConfidence = null,
-                            hasVideoHighlight = highlight?.url != null,
-                            videoUrl = highlight?.url
+                            hasVideoHighlight = highlight?.video_url != null,
+                            videoUrl = highlight?.video_url
                         )
                     )
                 }
