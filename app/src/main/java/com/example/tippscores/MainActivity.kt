@@ -3,52 +3,29 @@ package com.example.tippscores
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.example.tippscores.data.model.Match
+import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.tippscores.data.local.AppDatabase
+import com.example.tippscores.data.repository.MatchRepository
 import com.example.tippscores.ui.screens.MatchListScreen
+import com.example.tippscores.ui.viewmodel.MatchViewModel
+import com.example.tippscores.ui.viewmodel.MatchViewModelFactory
 
 class MainActivity : ComponentActivity() {
+
+    private val database by lazy { AppDatabase.getDatabase(this) }
+    private val repository by lazy { MatchRepository(database.matchDao()) }
+    private val viewModel: MatchViewModel by viewModels { MatchViewModelFactory(repository) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Minta adatok a teszteléshez
-        val dummyMatches = listOf(
-            Match(
-                id = "1",
-                leagueName = "Premier League",
-                leagueCountry = "ANGLIA",
-                homeTeam = "Liverpool",
-                homeTeamLogo = "",
-                awayTeam = "Nottingham",
-                awayTeamLogo = "",
-                homeScore = 2,
-                awayScore = 2,
-                status = "FT",
-                isLive = false,
-                tipPrediction = "TÚL 2.5",
-                tipConfidence = 88,
-                hasVideoHighlight = true
-            ),
-            Match(
-                id = "2",
-                leagueName = "Premier League",
-                leagueCountry = "ANGLIA",
-                homeTeam = "Bournemouth",
-                homeTeamLogo = "",
-                awayTeam = "Everton",
-                awayTeamLogo = "",
-                homeScore = 1,
-                awayScore = 0,
-                status = "72'",
-                isLive = true,
-                tipPrediction = "HAZAI",
-                tipConfidence = 75,
-                hasVideoHighlight = true
-            )
-        )
-
         setContent {
+            val matches by viewModel.matches.collectAsState()
+
             MatchListScreen(
-                matches = dummyMatches,
+                matches = matches,
                 onMatchClick = { matchId ->
                     // Megnyitja a meccs részleteit
                 }
