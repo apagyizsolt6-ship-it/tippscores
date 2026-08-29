@@ -16,157 +16,103 @@ class MatchViewModel(
     private val apiPreferences: ApiPreferences
 ) : ViewModel() {
 
-    // ========================================================
-    // MATCHES
-    // ========================================================
+    val matches: StateFlow<List<Match>> = repository.allMatches.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
-    val matches: StateFlow<List<Match>> =
-        repository.allMatches.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
 
-    // ========================================================
-    // LOADING
-    // ========================================================
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
 
-    private val _isLoading =
-        MutableStateFlow(false)
+    private val _statpalKey = MutableStateFlow(apiPreferences.statpalApiKey)
+    val statpalKey: StateFlow<String> = _statpalKey
 
-    val isLoading: StateFlow<Boolean> =
-        _isLoading
+    private val _highlightlyKey = MutableStateFlow(apiPreferences.highlightlyApiKey)
+    val highlightlyKey: StateFlow<String> = _highlightlyKey
 
-    // ========================================================
-    // ERROR
-    // ========================================================
-
-    private val _errorMessage =
-        MutableStateFlow<String?>(null)
-
-    val errorMessage: StateFlow<String?> =
-        _errorMessage
-
-    // ========================================================
-    // STATPAL KEY
-    // ========================================================
-
-    private val _statpalKey =
-        MutableStateFlow(
-            apiPreferences.statpalApiKey
-        )
-
-    val statpalKey: StateFlow<String> =
-        _statpalKey
-
-    // ========================================================
-    // HIGHLIGHTLY KEY
-    // ========================================================
-
-    private val _highlightlyKey =
-        MutableStateFlow(
-            apiPreferences.highlightlyApiKey
-        )
-
-    val highlightlyKey: StateFlow<String> =
-        _highlightlyKey
-
-    // ========================================================
-    // INIT
-    // ========================================================
+    private val _selectedOffset = MutableStateFlow(0)
+    val selectedOffset: StateFlow<Int> = _selectedOffset
 
     init {
         refreshData()
     }
 
-    // ========================================================
-    // REFRESH
-    // ========================================================
-
     fun refreshData() {
+        refreshForOffset(_selectedOffset.value)
+    }
+
+    fun selectDate(offset: Int) {
+        val safeOffset = offset.coerceIn(-7, 7)
+        if (_selectedOffset.value == safeOffset && matches.value.isNotEmpty()) {
+            return
+        }
+        _selectedOffset.value = safeOffset
+        refreshForOffset(safeOffset)
+    }
+
+    fun refreshForOffset(offset: Int) {
+        val safeOffset = offset.coerceIn(-7, 7)
+        _selectedOffset.value = safeOffset
 
         viewModelScope.launch {
-
             _isLoading.value = true
             _errorMessage.value = null
 
             try {
-
-                // MAI ÖSSZES MÉRKŐZÉS
-                repository.fetchMatchesForOffset(0)
-
+                repository.fetchMatchesForOffset(safeOffset)
             } catch (e: Exception) {
-
-                e.printStackTrace()
-
-                _errorMessage.value =
-                    e.localizedMessage
-                        ?: "Hálózati hiba történt az API lekérése közben."
-
+                _errorMessage.value = readableError(e)
             } finally {
-
                 _isLoading.value = false
             }
         }
     }
-
-    // ========================================================
-    // LIVE REFRESH
-    // ========================================================
 
     fun refreshLiveData() {
-
         viewModelScope.launch {
-
             _isLoading.value = true
             _errorMessage.value = null
 
             try {
-
                 repository.fetchLiveMatches()
-
             } catch (e: Exception) {
-
-                e.printStackTrace()
-
-                _errorMessage.value =
-                    e.localizedMessage
-                        ?: "Nem sikerült betölteni az élő mérkőzéseket."
-
+                _errorMessage.value = readableError(e)
             } finally {
-
                 _isLoading.value = false
             }
         }
     }
 
-    // ========================================================
-    // SAVE API KEYS
-    // ========================================================
+    fun saveKeysAndRefresh(statpalKey: String, highlightlyKey: String) {
+        val cleanStatpalKey = statpalKey.trim()
+        val cleanHighlightlyKey = highlightlyKey.trim()
 
-    fun saveKeysAndRefresh(
-        statpalKey: String,
-        highlightlyKey: String
-    ) {
+        apiPreferences.statpalApiKey = cleanStatpalKey
+        apiPreferences.highlightlyApiKey = cleanHighlightlyKey
 
-        val cleanStatpalKey =
-            statpalKey.trim()
-
-        val cleanHighlightlyKey =
-            highlightlyKey.trim()
-
-        apiPreferences.statpalApiKey =
-            cleanStatpalKey
-
-        apiPreferences.highlightlyApiKey =
-            cleanHighlightlyKey
-
-        _statpalKey.value =
-            cleanStatpalKey
-
-        _highlightlyKey.value =
-            cleanHighlightlyKey
+        _statpalKey.value = cleanStatpalKey
+        _highlightlyKey.value = cleanHighlightlyKey
 
         refreshData()
+    }
+
+    private fun readableError(exception: Exception): String {
+        val message = exception.localizedMessage.orEmpty()
+
+        return when {
+            message.contains("401") -> "A StatPal API-kulcs érvénytelen vagy nem jogosult erre a lekérésre."
+            message.contains("403") -> "A StatPal API-kulcs hozzáférése megtagadva."
+            message.contains("404") -> "A StatPal végpont nem található."
+            message.contains("Unable to resolve host", ignoreCase = true) ->
+                "Nincs internetkapcsolat vagy a szerver nem érhető el."
+            message.contains("Expected BEGIN_ARRAY", ignoreCase = true) ->
+                "A StatPal válasz formátuma nem várt módon érkezett."
+            message.isNotBlank() -> message
+            else -> "Hálózati hiba történt az API lekérése közben."
+        }
     }
 }
