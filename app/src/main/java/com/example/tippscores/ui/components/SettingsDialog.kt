@@ -24,61 +24,149 @@ fun SettingsDialog(
     initialStatpalKey: String,
     initialHighlightlyKey: String,
     onDismiss: () -> Unit,
-    onSave: (statpalKey: String, highlightlyKey: String) -> Unit
+    onSave: (
+        statpalKey: String,
+        highlightlyKey: String
+    ) -> Unit
 ) {
-    var statpalKey by remember(initialStatpalKey) { mutableStateOf(initialStatpalKey) }
-    var highlightlyKey by remember(initialHighlightlyKey) { mutableStateOf(initialHighlightlyKey) }
+
+    var statpalKey by
+        remember(initialStatpalKey) {
+            mutableStateOf(
+                initialStatpalKey
+            )
+        }
+
+    var highlightlyKey by
+        remember(initialHighlightlyKey) {
+            mutableStateOf(
+                initialHighlightlyKey
+            )
+        }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+
+        onDismissRequest =
+            onDismiss,
+
         title = {
+
             Text(
-                "API-kulcsok",
-                fontWeight = FontWeight.Bold,
+                text =
+                    "⚙️ API-kulcsok",
+
+                fontWeight =
+                    FontWeight.Bold,
+
                 fontSize = 18.sp
             )
         },
+
         text = {
+
             Column {
+
                 Text(
-                    "Az adatok betöltéséhez szükséges API-kulcsok.",
+                    text =
+                        "Az alkalmazás a mérkőzésekhez a StatPal, a videókhoz pedig a Highlightly szolgáltatást használja.",
+
                     fontSize = 12.sp
                 )
-                Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = statpalKey,
-                    onValueChange = { statpalKey = it },
-                    label = { Text("StatPal API-kulcs") },
-                    placeholder = { Text("StatPal kulcs") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+
+                    value =
+                        statpalKey,
+
+                    onValueChange = {
+                        statpalKey = it
+                    },
+
+                    label = {
+                        Text(
+                            "StatPal API-kulcs"
+                        )
+                    },
+
+                    placeholder = {
+                        Text(
+                            "Írd be a StatPal kulcsot"
+                        )
+                    },
+
+                    singleLine = true,
+
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(10.dp)
+                )
 
                 OutlinedTextField(
-                    value = highlightlyKey,
-                    onValueChange = { highlightlyKey = it },
-                    label = { Text("Highlightly API-kulcs") },
-                    placeholder = { Text("Highlightly kulcs") },
+
+                    value =
+                        highlightlyKey,
+
+                    onValueChange = {
+                        highlightlyKey = it
+                    },
+
+                    label = {
+                        Text(
+                            "Highlightly API-kulcs"
+                        )
+                    },
+
+                    placeholder = {
+                        Text(
+                            "Írd be a Highlightly kulcsot"
+                        )
+                    },
+
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
             }
         },
+
         confirmButton = {
+
             Button(
                 onClick = {
-                    onSave(statpalKey.trim(), highlightlyKey.trim())
+
+                    onSave(
+                        statpalKey.trim(),
+                        highlightlyKey.trim()
+                    )
                 }
             ) {
-                Text("Mentés és frissítés")
+
+                Text(
+                    "Mentés és frissítés"
+                )
             }
         },
+
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Mégse")
+
+            TextButton(
+                onClick =
+                    onDismiss
+            ) {
+
+                Text(
+                    "Mégse"
+                )
             }
         }
     )
