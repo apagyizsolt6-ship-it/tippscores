@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.ksp) // Kapt helyett KSP
 }
 
 android {
@@ -25,16 +25,23 @@ android {
 }
 
 dependencies {
-    // Compose UI
+    // Compose & Core
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
 
-    // Retrofit (API-khoz)
+    // Retrofit (API-k)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
-    // Image Loading (Logókhoz)
+    // Coil (Logók)
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Room Database (KSP-vel)
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1") // kapt helyett ksp
 }
