@@ -22,8 +22,11 @@ class MatchViewModel(
         initialValue = emptyList()
     )
 
-    private val _selectedOffset = MutableStateFlow(0) // 0 = MA
-    val selectedOffset: StateFlow<Int> = _selectedOffset
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
 
     private val _statpalKey = MutableStateFlow(apiPreferences.statpalApiKey)
     val statpalKey: StateFlow<String> = _statpalKey
@@ -32,15 +35,20 @@ class MatchViewModel(
     val highlightlyKey: StateFlow<String> = _highlightlyKey
 
     init {
-        viewModelScope.launch {
-            repository.fetchMatchesForOffset(0)
-        }
+        refreshData()
     }
 
-    fun selectOffset(offset: Int) {
-        _selectedOffset.value = offset
+    fun refreshData() {
         viewModelScope.launch {
-            repository.fetchMatchesForOffset(offset)
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                repository.fetchMatchesForOffset(0)
+            } catch (e: Exception) {
+                _errorMessage.value = e.localizedMessage ?: "Hálózati hiba történt az API lekérése közben."
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -50,8 +58,6 @@ class MatchViewModel(
         _statpalKey.value = statpalKey
         _highlightlyKey.value = highlightlyKey
 
-        viewModelScope.launch {
-            repository.fetchMatchesForOffset(_selectedOffset.value)
-        }
+        refreshData()
     }
 }
