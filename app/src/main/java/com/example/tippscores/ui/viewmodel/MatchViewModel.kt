@@ -22,7 +22,9 @@ class MatchViewModel(
         initialValue = emptyList()
     )
 
-    // REAKTÍV ÁLLAPOTOK AZ API KULCSOKNAK
+    private val _selectedOffset = MutableStateFlow(0) // 0 = MA
+    val selectedOffset: StateFlow<Int> = _selectedOffset
+
     private val _statpalKey = MutableStateFlow(apiPreferences.statpalApiKey)
     val statpalKey: StateFlow<String> = _statpalKey
 
@@ -31,22 +33,25 @@ class MatchViewModel(
 
     init {
         viewModelScope.launch {
-            repository.fetchRealMatchesFromNetwork()
+            repository.fetchMatchesForOffset(0)
+        }
+    }
+
+    fun selectOffset(offset: Int) {
+        _selectedOffset.value = offset
+        viewModelScope.launch {
+            repository.fetchMatchesForOffset(offset)
         }
     }
 
     fun saveKeysAndRefresh(statpalKey: String, highlightlyKey: String) {
-        // 1. Mentés a Preferences-be
         apiPreferences.statpalApiKey = statpalKey
         apiPreferences.highlightlyApiKey = highlightlyKey
-
-        // 2. State-ek frissítése a UI felé
         _statpalKey.value = statpalKey
         _highlightlyKey.value = highlightlyKey
 
-        // 3. Hálózati frissítés indítása
         viewModelScope.launch {
-            repository.fetchRealMatchesFromNetwork()
+            repository.fetchMatchesForOffset(_selectedOffset.value)
         }
     }
 }
