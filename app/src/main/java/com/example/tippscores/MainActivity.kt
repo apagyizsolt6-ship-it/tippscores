@@ -16,46 +16,98 @@ import com.example.tippscores.ui.viewmodel.MatchViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private val apiPreferences by lazy { ApiPreferences(this) }
-    private val database by lazy { AppDatabase.getDatabase(this) }
+    private val apiPreferences by lazy {
+        ApiPreferences(this)
+    }
+
+    private val database by lazy {
+        AppDatabase.getDatabase(this)
+    }
+
     private val repository by lazy {
-        MatchRepository(database.matchDao(), apiPreferences)
+        MatchRepository(
+            database.matchDao(),
+            apiPreferences
+        )
     }
 
     private val viewModel: MatchViewModel by viewModels {
+
         object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+
+            override fun <T : ViewModel> create(
+                modelClass: Class<T>
+            ): T {
+
                 @Suppress("UNCHECKED_CAST")
-                return MatchViewModel(repository, apiPreferences) as T
+
+                return MatchViewModel(
+                    repository = repository,
+                    apiPreferences = apiPreferences
+                ) as T
             }
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val matches by viewModel.matches.collectAsState()
-            val isLoading by viewModel.isLoading.collectAsState()
-            val errorMessage by viewModel.errorMessage.collectAsState()
-            val statpalKey by viewModel.statpalKey.collectAsState()
-            val highlightlyKey by viewModel.highlightlyKey.collectAsState()
-            val selectedOffset by viewModel.selectedOffset.collectAsState()
+
+            val matches by
+                viewModel.matches.collectAsState()
+
+            val isLoading by
+                viewModel.isLoading.collectAsState()
+
+            val errorMessage by
+                viewModel.errorMessage.collectAsState()
+
+            val statpalKey by
+                viewModel.statpalKey.collectAsState()
+
+            val highlightlyKey by
+                viewModel.highlightlyKey.collectAsState()
+
+            val selectedOffset by
+                viewModel.selectedOffset.collectAsState()
 
             MatchListScreen(
+
                 matches = matches,
+
                 errorMessage = errorMessage,
+
                 isLoading = isLoading,
+
                 statpalKey = statpalKey,
+
                 highlightlyKey = highlightlyKey,
+
                 selectedOffset = selectedOffset,
-                onRefresh = { viewModel.refreshData() },
-                onDateSelected = { offset -> viewModel.selectDate(offset) },
-                onSaveKeys = { sKey, hKey ->
-                    viewModel.saveKeysAndRefresh(sKey, hKey)
+
+                onRefresh = {
+                    viewModel.refreshData()
                 },
+
+                onOffsetSelected = { offset ->
+                    viewModel.selectOffset(offset)
+                },
+
+                onSaveKeys = { sKey, hKey ->
+
+                    viewModel.saveKeysAndRefresh(
+                        sKey,
+                        hKey
+                    )
+                },
+
                 onMatchClick = { matchId ->
-                    // A meccsrészletek képernyő a következő fejlesztési lépés.
+
+                    // Meccs részletei
+                    // későbbi képernyőre kötve.
                 }
             )
         }
