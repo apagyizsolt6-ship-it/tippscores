@@ -16,103 +16,201 @@ class MatchViewModel(
     private val apiPreferences: ApiPreferences
 ) : ViewModel() {
 
-    val matches: StateFlow<List<Match>> = repository.allMatches.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    // ========================================================
+    // MÉRKŐZÉSEK
+    // ========================================================
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+    val matches: StateFlow<List<Match>> =
+        repository.allMatches.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage
+    // ========================================================
+    // LOADING
+    // ========================================================
 
-    private val _statpalKey = MutableStateFlow(apiPreferences.statpalApiKey)
-    val statpalKey: StateFlow<String> = _statpalKey
+    private val _isLoading =
+        MutableStateFlow(false)
 
-    private val _highlightlyKey = MutableStateFlow(apiPreferences.highlightlyApiKey)
-    val highlightlyKey: StateFlow<String> = _highlightlyKey
+    val isLoading: StateFlow<Boolean> =
+        _isLoading
 
-    private val _selectedOffset = MutableStateFlow(0)
-    val selectedOffset: StateFlow<Int> = _selectedOffset
+    // ========================================================
+    // HIBA
+    // ========================================================
+
+    private val _errorMessage =
+        MutableStateFlow<String?>(null)
+
+    val errorMessage: StateFlow<String?> =
+        _errorMessage
+
+    // ========================================================
+    // API KULCSOK
+    // ========================================================
+
+    private val _statpalKey =
+        MutableStateFlow(
+            apiPreferences.statpalApiKey
+        )
+
+    val statpalKey: StateFlow<String> =
+        _statpalKey
+
+    private val _highlightlyKey =
+        MutableStateFlow(
+            apiPreferences.highlightlyApiKey
+        )
+
+    val highlightlyKey: StateFlow<String> =
+        _highlightlyKey
+
+    // ========================================================
+    // KIVÁLASZTOTT NAP
+    // ========================================================
+
+    private val _selectedOffset =
+        MutableStateFlow(0)
+
+    val selectedOffset: StateFlow<Int> =
+        _selectedOffset
+
+    // ========================================================
+    // INIT
+    // ========================================================
 
     init {
         refreshData()
     }
 
+    // ========================================================
+    // AKTUÁLIS NAP FRISSÍTÉSE
+    // ========================================================
+
     fun refreshData() {
-        refreshForOffset(_selectedOffset.value)
+
+        loadMatches(
+            offset = _selectedOffset.value
+        )
     }
 
-    fun selectDate(offset: Int) {
-        val safeOffset = offset.coerceIn(-7, 7)
-        if (_selectedOffset.value == safeOffset && matches.value.isNotEmpty()) {
+    // ========================================================
+    // NAP KIVÁLASZTÁSA
+    // ========================================================
+
+    fun selectOffset(
+        offset: Int
+    ) {
+
+        val safeOffset =
+            offset.coerceIn(-7, 7)
+
+        if (_selectedOffset.value == safeOffset) {
+            refreshData()
             return
         }
-        _selectedOffset.value = safeOffset
-        refreshForOffset(safeOffset)
+
+        _selectedOffset.value =
+            safeOffset
+
+        loadMatches(
+            offset = safeOffset
+        )
     }
 
-    fun refreshForOffset(offset: Int) {
-        val safeOffset = offset.coerceIn(-7, 7)
-        _selectedOffset.value = safeOffset
+    // ========================================================
+    // MÉRKŐZÉSEK BETÖLTÉSE
+    // ========================================================
+
+    private fun loadMatches(
+        offset: Int
+    ) {
 
         viewModelScope.launch {
+
             _isLoading.value = true
             _errorMessage.value = null
 
             try {
-                repository.fetchMatchesForOffset(safeOffset)
+
+                repository.fetchMatchesForOffset(
+                    offset = offset
+                )
+
             } catch (e: Exception) {
-                _errorMessage.value = readableError(e)
+
+                e.printStackTrace()
+
+                _errorMessage.value =
+                    e.localizedMessage
+                        ?: "Nem sikerült betölteni a mérkőzéseket."
+
             } finally {
+
                 _isLoading.value = false
             }
         }
     }
+
+    // ========================================================
+    // LIVE ADATOK
+    // ========================================================
 
     fun refreshLiveData() {
+
         viewModelScope.launch {
+
             _isLoading.value = true
             _errorMessage.value = null
 
             try {
+
                 repository.fetchLiveMatches()
+
             } catch (e: Exception) {
-                _errorMessage.value = readableError(e)
+
+                e.printStackTrace()
+
+                _errorMessage.value =
+                    e.localizedMessage
+                        ?: "Nem sikerült betölteni az élő mérkőzéseket."
+
             } finally {
+
                 _isLoading.value = false
             }
         }
     }
 
-    fun saveKeysAndRefresh(statpalKey: String, highlightlyKey: String) {
-        val cleanStatpalKey = statpalKey.trim()
-        val cleanHighlightlyKey = highlightlyKey.trim()
+    // ========================================================
+    // API KULCSOK MENTÉSE
+    // ========================================================
 
-        apiPreferences.statpalApiKey = cleanStatpalKey
-        apiPreferences.highlightlyApiKey = cleanHighlightlyKey
+    fun saveKeysAndRefresh(
+        statpalKey: String,
+        highlightlyKey: String
+    ) {
 
-        _statpalKey.value = cleanStatpalKey
-        _highlightlyKey.value = cleanHighlightlyKey
+        val cleanStatpalKey =
+            statpalKey.trim()
+
+        val cleanHighlightlyKey =
+            highlightlyKey.trim()
+
+        apiPreferences.statpalApiKey =
+            cleanStatpalKey
+
+        apiPreferences.highlightlyApiKey =
+            cleanHighlightlyKey
+
+        _statpalKey.value =
+            cleanStatpalKey
+
+        _highlightlyKey.value =
+            cleanHighlightlyKey
 
         refreshData()
-    }
-
-    private fun readableError(exception: Exception): String {
-        val message = exception.localizedMessage.orEmpty()
-
-        return when {
-            message.contains("401") -> "A StatPal API-kulcs érvénytelen vagy nem jogosult erre a lekérésre."
-            message.contains("403") -> "A StatPal API-kulcs hozzáférése megtagadva."
-            message.contains("404") -> "A StatPal végpont nem található."
-            message.contains("Unable to resolve host", ignoreCase = true) ->
-                "Nincs internetkapcsolat vagy a szerver nem érhető el."
-            message.contains("Expected BEGIN_ARRAY", ignoreCase = true) ->
-                "A StatPal válasz formátuma nem várt módon érkezett."
-            message.isNotBlank() -> message
-            else -> "Hálózati hiba történt az API lekérése közben."
-        }
     }
 }
