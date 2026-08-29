@@ -18,7 +18,9 @@ class MainActivity : ComponentActivity() {
 
     private val apiPreferences by lazy { ApiPreferences(this) }
     private val database by lazy { AppDatabase.getDatabase(this) }
-    private val repository by lazy { MatchRepository(database.matchDao(), apiPreferences) }
+    private val repository by lazy {
+        MatchRepository(database.matchDao(), apiPreferences)
+    }
 
     private val viewModel: MatchViewModel by viewModels {
         object : ViewModelProvider.Factory {
@@ -38,6 +40,7 @@ class MainActivity : ComponentActivity() {
             val errorMessage by viewModel.errorMessage.collectAsState()
             val statpalKey by viewModel.statpalKey.collectAsState()
             val highlightlyKey by viewModel.highlightlyKey.collectAsState()
+            val selectedOffset by viewModel.selectedOffset.collectAsState()
 
             MatchListScreen(
                 matches = matches,
@@ -45,12 +48,14 @@ class MainActivity : ComponentActivity() {
                 isLoading = isLoading,
                 statpalKey = statpalKey,
                 highlightlyKey = highlightlyKey,
+                selectedOffset = selectedOffset,
                 onRefresh = { viewModel.refreshData() },
+                onDateSelected = { offset -> viewModel.selectDate(offset) },
                 onSaveKeys = { sKey, hKey ->
                     viewModel.saveKeysAndRefresh(sKey, hKey)
                 },
                 onMatchClick = { matchId ->
-                    // Meccs részletei
+                    // A meccsrészletek képernyő a következő fejlesztési lépés.
                 }
             )
         }
