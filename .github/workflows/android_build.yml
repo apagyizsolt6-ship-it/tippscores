@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "master" ] # Amikor elmented a kódot a fő ágon
+    branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
 
@@ -21,12 +21,18 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    # 1. GENERÁLJUK A HIÁNYZÓ GRADLE WRAPPER JAR FÁJLT
+    - name: Setup Gradle Wrapper
+      run: gradle wrapper
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    # 2. APK FORDÍTÁS
     - name: Build APK with Gradle
       run: ./gradlew assembleDebug --stacktrace
 
+    # 3. KÉSZ APK LETÖLTÉSE
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
