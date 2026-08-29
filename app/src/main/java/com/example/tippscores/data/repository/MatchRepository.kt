@@ -18,52 +18,74 @@ class MatchRepository(
         entities.map { it.toMatch() }
     }
 
-    suspend fun fetchRealMatchesFromNetwork() {
-        val statpalKey = apiPreferences.statpalApiKey
-        val highlightlyKey = apiPreferences.highlightlyApiKey
+    suspend fun fetchMatchesForOffset(offset: Int = 0) {
+        val statpalKey = apiPreferences.statpalApiKey.trim()
+        val highlightlyKey = apiPreferences.highlightlyApiKey.trim()
 
-        if (statpalKey.isNotBlank()) {
-            try {
-                // 1. Statpal meccsek és tippek lekérése
-                val remoteMatches = NetworkModule.statpalApi.getMatches(statpalKey)
+        if (statpalKey.isEmpty()) {
+            matchDao.clearMatches()
+            return
+        }
 
-                // 2. Highlightly videó meglét lekérése (ha van kulcs)
-                val highlightsMap = if (highlightlyKey.isNotBlank()) {
-                    try {
-                        NetworkModule.highlightlyApi.getHighlights(highlightlyKey)
-                            .associateBy { it.match_id }
-                    } catch (e: Exception) {
-                        emptyMap()
-                    }
-                } else emptyMap()
+        try {
+            // Ha offset == 0, akkor a live meccseket kérjük, egyébként a daily végpontot offsettel
+            val response = if (offset == 0) {
+                NetworkModule.statpalApi.getLiveMatches(statpalKey)
+            } else {
+                NetworkModule.statpalApi.getDailyMatches(offset = offset, accessKey = statpalKey)
+            }
 
-                // 3. Adatok összefésülése és mentése a Room adatbázisba
-                val entities = remoteMatches.map { dto ->
-                    val highlight = highlightsMap[dto.id]
-                    MatchEntity(
-                        id = dto.id,
-                        leagueName = dto.league_name ?: "Liga",
-                        leagueCountry = dto.country_name ?: "Ország",
-                        homeTeam = dto.home_team ?: "Hazai",
-                        homeTeamLogo = dto.home_team_logo ?: "",
-                        awayTeam = dto.away_team ?: "Vendég",
-                        awayTeamLogo = dto.away_team_logo ?: "",
-                        homeScore = dto.home_score,
-                        awayScore = dto.away_score,
-                        status = dto.status ?: "18:00",
-                        isLive = dto.is_live,
-                        tipPrediction = dto.prediction,
-                        tipConfidence = dto.confidence,
-                        hasVideoHighlight = highlight?.video_url != null,
-                        videoUrl = highlight?.video_url
+            val highlightsMap = if (highlightlyKey.isNotEmpty()) {
+                try {
+                    NetworkModule.highlightlyApi.getHighlights(apiKey = highlightlyKey)
+                        .filter { !it.match_id.isNullOrEmpty() }
+                        .associateBy { it.match_id!! }
+                } catch (e: Exception) {
+                    emptyMap()
+                }
+            } else emptyMap()
+
+            val matchEntities = mutableListOf<MatchEntity>()
+
+            response.data?.leagues?.forEach { league ->
+                val countryAndLeague = league.name ?: "Bajnokság"
+                val parts = countryAndLeague.split(":")
+                val country = parts.getOrNull(0)?.trim()?.uppercase() ?: "FOCI"
+                val leagueName = parts.getOrNull(1)?.trim() ?: countryAndLeague
+
+                league.matches?.forEach { m ->
+                    val highlight = highlightsMap[m.mainId]
+
+                    matchEntities.add(
+                        MatchEntity(
+                            id = m.mainId ?: System.currentTimeMillis().toString(),
+                            leagueName = leagueName,
+                            leagueCountry = country,
+                            homeTeam = m.home?.name ?: "Hazai",
+                            homeTeamLogo = "",
+                            awayTeam = m.away?.name ?: "Vendég",
+                            awayTeamLogo = "",
+                            homeScore = m.home?.goals?.toIntOrNull(),
+                            awayScore = m.away?.goals?.toIntOrNull(),
+                            status = m.status ?: m.time ?: "FT",
+                            isLive = m.status != "FT" && m.status != "AET" && offset == 0,
+                            tipPrediction = null,
+                            tipConfidence = null,
+                            hasVideoHighlight = highlight?.url != null,
+                            videoUrl = highlight?.url
+                        )
                     )
                 }
-
-                matchDao.clearMatches()
-                matchDao.insertMatches(entities)
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
+
+            matchDao.clearMatches()
+            if (matchEntities.isNotEmpty()) {
+                matchDao.insertMatches(matchEntities)
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            matchDao.clearMatches()
         }
     }
 }
