@@ -20,8 +20,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -1048,9 +1048,9 @@ private fun DateArrow(
 
                 imageVector =
                     if (left) {
-                        Icons.Default.ChevronLeft
+                        Icons.Default.KeyboardArrowLeft
                     } else {
-                        Icons.Default.ChevronRight
+                        Icons.Default.KeyboardArrowRight
                     },
 
                 contentDescription =
