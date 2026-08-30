@@ -8,6 +8,7 @@ import com.example.tippscores.data.repository.MatchRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -17,11 +18,28 @@ class MatchViewModel(
 ) : ViewModel() {
 
     // ========================================================
-    // MÉRKŐZÉSEK
+    // KEDVENCEK (a csillag a mérkőzéssoron - SharedPreferences-ben
+    // tárolva, mert a "matches" tábla minden frissítéskor törlődik)
+    // ========================================================
+
+    private val _favoriteIds =
+        MutableStateFlow(apiPreferences.favoriteMatchIds)
+
+    val favoriteIds: StateFlow<Set<String>> =
+        _favoriteIds
+
+    fun toggleFavorite(matchId: String) {
+        _favoriteIds.value = apiPreferences.toggleFavoriteMatch(matchId)
+    }
+
+    // ========================================================
+    // MÉRKŐZÉSEK (a nyers lista + a kedvenc-jelölés összefésülve)
     // ========================================================
 
     val matches: StateFlow<List<Match>> =
-        repository.allMatches.stateIn(
+        combine(repository.allMatches, _favoriteIds) { list, favIds ->
+            list.map { it.copy(isFavorite = favIds.contains(it.id)) }
+        }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
