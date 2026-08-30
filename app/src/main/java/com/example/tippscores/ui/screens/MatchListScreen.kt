@@ -27,14 +27,17 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,9 +53,21 @@ import com.example.tippscores.data.model.Match
 import com.example.tippscores.ui.components.LeagueHeader
 import com.example.tippscores.ui.components.MatchRow
 import com.example.tippscores.ui.components.SettingsDialog
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+
+// ============================================================
+// ALSÓ NAVIGÁCIÓ FÜLEI
+// ============================================================
+
+private enum class BottomTab {
+    ALL, LIVE, FAVORITES, LEAGUES
+}
+
+private fun groupKey(match: Match): String =
+    "${match.leagueCountry}|${match.leagueName}"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -66,12 +81,33 @@ fun MatchListScreen(
     onRefresh: () -> Unit,
     onDateSelected: (Int) -> Unit,
     onSaveKeys: (String, String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
     onMatchClick: (String) -> Unit
 ) {
 
     var showSettingsDialog by
         remember {
             mutableStateOf(false)
+        }
+
+    var selectedTab by
+        remember {
+            mutableStateOf(BottomTab.ALL)
+        }
+
+    var collapsedLeagues by
+        remember {
+            mutableStateOf(setOf<String>())
+        }
+
+    var leagueFilter by
+        remember {
+            mutableStateOf<String?>(null)
+        }
+
+    var searchQuery by
+        remember {
+            mutableStateOf("")
         }
 
     // ========================================================
@@ -120,6 +156,57 @@ fun MatchListScreen(
         ).format(
             selectedDate.time
         )
+
+    // Ha az Élő fülre váltunk, ugorjunk a mai napra (élő meccs
+    // csak ma lehet), és onnantól 30 másodpercenként frissítsünk
+    // automatikusan, amíg ezen a fülön vagyunk.
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == BottomTab.LIVE) {
+            if (selectedOffset != 0) {
+                onDateSelected(0)
+            }
+            while (true) {
+                delay(30_000)
+                onRefresh()
+            }
+        }
+    }
+
+    // Napváltáskor a korábban kiválasztott bajnokság-szűrő már
+    // nem biztos, hogy értelmes (más meccsek vannak aznap) - töröljük.
+    LaunchedEffect(selectedOffset) {
+        leagueFilter = null
+    }
+
+    // ========================================================
+    // SZŰRÉS: KERESÉS -> FÜL -> BAJNOKSÁG
+    // ========================================================
+
+    val searched =
+        if (searchQuery.isBlank()) {
+            matches
+        } else {
+            val q = searchQuery.trim()
+            matches.filter {
+                it.homeTeam.contains(q, ignoreCase = true) ||
+                    it.awayTeam.contains(q, ignoreCase = true)
+            }
+        }
+
+    val tabFiltered =
+        when (selectedTab) {
+            BottomTab.LIVE -> searched.filter { it.isLive }
+            BottomTab.FAVORITES -> searched.filter { it.isFavorite }
+            BottomTab.ALL, BottomTab.LEAGUES -> searched
+        }
+
+    val displayedMatches =
+        leagueFilter?.let { filterKey ->
+            tabFiltered.filter { groupKey(it) == filterKey }
+        } ?: tabFiltered
+
+    val visibleGroupKeys =
+        displayedMatches.map { groupKey(it) }.toSet()
 
     // ========================================================
     // FŐ KÉPERNYŐ
@@ -214,6 +301,32 @@ fun MatchListScreen(
 
                         IconButton(
                             onClick = {
+                                collapsedLeagues =
+                                    if (collapsedLeagues.isEmpty()) {
+                                        visibleGroupKeys
+                                    } else {
+                                        emptySet()
+                                    }
+                            }
+                        ) {
+
+                            Text(
+                                text =
+                                    if (collapsedLeagues.isEmpty()) "▾" else "▸",
+
+                                color =
+                                    Color.White,
+
+                                fontSize =
+                                    20.sp,
+
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
                                 showSettingsDialog =
                                     true
                             }
@@ -253,9 +366,12 @@ fun MatchListScreen(
                 NavigationBarItem(
 
                     selected =
-                        true,
+                        selectedTab == BottomTab.ALL,
 
-                    onClick = {},
+                    onClick = {
+                        selectedTab = BottomTab.ALL
+                        leagueFilter = null
+                    },
 
                     icon = {
                         Text("⚽")
@@ -272,9 +388,12 @@ fun MatchListScreen(
                 NavigationBarItem(
 
                     selected =
-                        false,
+                        selectedTab == BottomTab.LIVE,
 
-                    onClick = {},
+                    onClick = {
+                        selectedTab = BottomTab.LIVE
+                        leagueFilter = null
+                    },
 
                     icon = {
                         Text("🔴")
@@ -291,9 +410,12 @@ fun MatchListScreen(
                 NavigationBarItem(
 
                     selected =
-                        false,
+                        selectedTab == BottomTab.FAVORITES,
 
-                    onClick = {},
+                    onClick = {
+                        selectedTab = BottomTab.FAVORITES
+                        leagueFilter = null
+                    },
 
                     icon = {
                         Text("★")
@@ -310,9 +432,12 @@ fun MatchListScreen(
                 NavigationBarItem(
 
                     selected =
-                        false,
+                        selectedTab == BottomTab.LEAGUES,
 
-                    onClick = {},
+                    onClick = {
+                        selectedTab = BottomTab.LEAGUES
+                        leagueFilter = null
+                    },
 
                     icon = {
                         Text("🏆")
@@ -351,6 +476,57 @@ fun MatchListScreen(
 
                 onDateSelected =
                     onDateSelected
+            )
+
+            // =================================================
+            // CSAPATKERESŐ
+            // =================================================
+
+            OutlinedTextField(
+
+                value =
+                    searchQuery,
+
+                onValueChange = {
+                    searchQuery = it
+                },
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 10.dp,
+                            vertical = 4.dp
+                        ),
+
+                placeholder = {
+                    Text(
+                        "Csapat keresése…",
+                        fontSize = 13.sp
+                    )
+                },
+
+                leadingIcon = {
+                    Text("🔍")
+                },
+
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        Text(
+                            text = "✕",
+                            color = Color(0xFF94A3B8),
+                            modifier =
+                                Modifier.clickable {
+                                    searchQuery = ""
+                                }
+                        )
+                    }
+                },
+
+                singleLine = true,
+
+                shape =
+                    RoundedCornerShape(10.dp)
             )
 
             // =================================================
@@ -419,12 +595,15 @@ fun MatchListScreen(
                         Text(
 
                             text =
-                                if (
-                                    selectedOffset == 0
-                                ) {
-                                    "Mai mérkőzések"
-                                } else {
-                                    selectedDateText
+                                when {
+                                    selectedTab == BottomTab.LIVE ->
+                                        "Élő mérkőzések"
+                                    selectedTab == BottomTab.FAVORITES ->
+                                        "Kedvenc mérkőzések"
+                                    selectedOffset == 0 ->
+                                        "Mai mérkőzések"
+                                    else ->
+                                        selectedDateText
                                 },
 
                             fontWeight =
@@ -438,35 +617,83 @@ fun MatchListScreen(
                         )
                     }
 
-                    Surface(
+                    Row(
+                        verticalAlignment =
+                            Alignment.CenterVertically,
 
-                        color =
-                            Color(0xFFEFF6FF),
-
-                        shape =
-                            RoundedCornerShape(8.dp)
+                        horizontalArrangement =
+                            Arrangement.spacedBy(6.dp)
                     ) {
 
-                        Text(
+                        if (leagueFilter != null) {
 
-                            text =
-                                "${matches.size} meccs",
+                            Surface(
+
+                                color =
+                                    Color(0xFFFFFBEB),
+
+                                shape =
+                                    RoundedCornerShape(8.dp),
+
+                                modifier =
+                                    Modifier.clickable {
+                                        leagueFilter = null
+                                    }
+                            ) {
+
+                                Text(
+
+                                    text =
+                                        "Szűrve ✕",
+
+                                    color =
+                                        Color(0xFF92400E),
+
+                                    fontWeight =
+                                        FontWeight.Bold,
+
+                                    fontSize =
+                                        11.sp,
+
+                                    modifier =
+                                        Modifier.padding(
+                                            horizontal = 8.dp,
+                                            vertical = 4.dp
+                                        )
+                                )
+                            }
+                        }
+
+                        Surface(
 
                             color =
-                                Color(0xFF2563EB),
+                                Color(0xFFEFF6FF),
 
-                            fontWeight =
-                                FontWeight.Bold,
+                            shape =
+                                RoundedCornerShape(8.dp)
+                        ) {
 
-                            fontSize =
-                                11.sp,
+                            Text(
 
-                            modifier =
-                                Modifier.padding(
-                                    horizontal = 8.dp,
-                                    vertical = 4.dp
-                                )
-                        )
+                                text =
+                                    "${displayedMatches.size} meccs",
+
+                                color =
+                                    Color(0xFF2563EB),
+
+                                fontWeight =
+                                    FontWeight.Bold,
+
+                                fontSize =
+                                    11.sp,
+
+                                modifier =
+                                    Modifier.padding(
+                                        horizontal = 8.dp,
+                                        vertical = 4.dp
+                                    )
+                            )
+                        }
                     }
                 }
             }
@@ -615,7 +842,7 @@ fun MatchListScreen(
                     }
 
                     // =========================================
-                    // NINCS MECCS
+                    // NINCS MECCS EZEN A NAPON (API szinten üres)
                     // =========================================
 
                     matches.isEmpty() -> {
@@ -679,16 +906,237 @@ fun MatchListScreen(
                     }
 
                     // =========================================
+                    // BAJNOKSÁGOK KÖNYVTÁRA
+                    // =========================================
+
+                    selectedTab == BottomTab.LEAGUES -> {
+
+                        if (searched.isEmpty()) {
+
+                            Column(
+
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(24.dp),
+
+                                horizontalAlignment =
+                                    Alignment.CenterHorizontally,
+
+                                verticalArrangement =
+                                    Arrangement.Center
+                            ) {
+
+                                Text(
+                                    text = "⚽",
+                                    fontSize = 36.sp
+                                )
+
+                                Spacer(Modifier.height(8.dp))
+
+                                Text(
+                                    text =
+                                        "Nincs találat erre: \"$searchQuery\".",
+
+                                    fontWeight =
+                                        FontWeight.Bold,
+
+                                    textAlign =
+                                        TextAlign.Center,
+
+                                    color =
+                                        Color(0xFF334155)
+                                )
+                            }
+
+                        } else {
+
+                            val leagueGroups =
+                                searched
+                                    .groupBy { groupKey(it) }
+                                    .toList()
+                                    .sortedBy { it.first }
+
+                            LazyColumn(
+                                modifier =
+                                    Modifier.fillMaxSize(),
+
+                                contentPadding =
+                                    PaddingValues(
+                                        vertical = 4.dp,
+                                        bottom = 10.dp
+                                    )
+                            ) {
+
+                                items(
+                                    items = leagueGroups,
+                                    key = { it.first }
+                                ) { (key, group) ->
+
+                                    val first = group.first()
+
+                                    Surface(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    leagueFilter = key
+                                                    selectedTab = BottomTab.ALL
+                                                },
+
+                                        color =
+                                            Color.White
+                                    ) {
+
+                                        Column {
+
+                                            Row(
+                                                modifier =
+                                                    Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(
+                                                            horizontal = 14.dp,
+                                                            vertical = 10.dp
+                                                        ),
+
+                                                verticalAlignment =
+                                                    Alignment.CenterVertically
+                                            ) {
+
+                                                Text(
+                                                    text =
+                                                        first.leagueCountryFlag.ifBlank { "🏆" },
+
+                                                    fontSize = 16.sp
+                                                )
+
+                                                Spacer(Modifier.width(10.dp))
+
+                                                Column(
+                                                    modifier =
+                                                        Modifier.weight(1f)
+                                                ) {
+
+                                                    Text(
+                                                        text = first.leagueCountry,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp,
+                                                        color = Color(0xFF64748B)
+                                                    )
+
+                                                    Text(
+                                                        text = first.leagueName,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = Color(0xFF0F172A)
+                                                    )
+                                                }
+
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = Color(0xFFEFF6FF)
+                                                ) {
+
+                                                    Text(
+                                                        text = "${group.size}",
+                                                        color = Color(0xFF2563EB),
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp,
+                                                        modifier =
+                                                            Modifier.padding(
+                                                                horizontal = 8.dp,
+                                                                vertical = 4.dp
+                                                            )
+                                                    )
+                                                }
+                                            }
+
+                                            HorizontalDivider(
+                                                modifier =
+                                                    Modifier.padding(horizontal = 10.dp),
+                                                thickness = 0.5.dp,
+                                                color = Color(0xFFE2E8F0)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // =========================================
+                    // ADOTT FÜLÖN/SZŰRŐN NINCS TALÁLAT
+                    // =========================================
+
+                    displayedMatches.isEmpty() -> {
+
+                        val (title, subtitle) =
+                            when {
+                                selectedTab == BottomTab.LIVE ->
+                                    "Nincs élő mérkőzés." to
+                                        "Nézz vissza később, vagy válts az Összes fülre."
+
+                                selectedTab == BottomTab.FAVORITES ->
+                                    "Még nincs kedvenc mérkőzésed." to
+                                        "Koppints a csillagra egy meccsnél a hozzáadáshoz."
+
+                                searchQuery.isNotBlank() ->
+                                    "Nincs találat erre: \"$searchQuery\"." to
+                                        "Próbálj másik csapatnevet."
+
+                                else ->
+                                    "Nincs mérkőzés ebben a szűrésben." to
+                                        "Töröld a szűrőt, vagy válassz másik napot."
+                            }
+
+                        Column(
+
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+
+                            horizontalAlignment =
+                                Alignment.CenterHorizontally,
+
+                            verticalArrangement =
+                                Arrangement.Center
+                        ) {
+
+                            Text(
+                                text = "⚽",
+                                fontSize = 36.sp
+                            )
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Text(
+                                text = title,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                color = Color(0xFF334155)
+                            )
+
+                            Spacer(Modifier.height(5.dp))
+
+                            Text(
+                                text = subtitle,
+                                textAlign = TextAlign.Center,
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    // =========================================
                     // MECCSLISTA
                     // =========================================
 
                     else -> {
 
                         val grouped =
-                            matches
-                                .groupBy {
-                                    "${it.leagueCountry}|${it.leagueName}"
-                                }
+                            displayedMatches
+                                .groupBy { groupKey(it) }
                                 .toList()
                                 .sortedBy {
                                     it.first
@@ -706,7 +1154,7 @@ fun MatchListScreen(
                         ) {
 
                             grouped.forEach {
-                                (_, matchGroup) ->
+                                (key, matchGroup) ->
 
                                 stickyHeader {
 
@@ -720,29 +1168,52 @@ fun MatchListScreen(
                                         leagueName =
                                             matchGroup
                                                 .first()
-                                                .leagueName
+                                                .leagueName,
+
+                                        flag =
+                                            matchGroup
+                                                .first()
+                                                .leagueCountryFlag,
+
+                                        isCollapsed =
+                                            key in collapsedLeagues,
+
+                                        onToggleCollapse = {
+                                            collapsedLeagues =
+                                                if (key in collapsedLeagues) {
+                                                    collapsedLeagues - key
+                                                } else {
+                                                    collapsedLeagues + key
+                                                }
+                                        }
                                     )
                                 }
 
-                                items(
+                                if (key !in collapsedLeagues) {
 
-                                    items =
-                                        matchGroup,
+                                    items(
 
-                                    key = {
-                                        it.id
+                                        items =
+                                            matchGroup,
+
+                                        key = {
+                                            it.id
+                                        }
+
+                                    ) { match ->
+
+                                        MatchRow(
+
+                                            match =
+                                                match,
+
+                                            onMatchClick =
+                                                onMatchClick,
+
+                                            onToggleFavorite =
+                                                onToggleFavorite
+                                        )
                                     }
-
-                                ) { match ->
-
-                                    MatchRow(
-
-                                        match =
-                                            match,
-
-                                        onMatchClick =
-                                            onMatchClick
-                                    )
                                 }
                             }
                         }
