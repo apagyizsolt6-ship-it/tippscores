@@ -963,7 +963,7 @@ fun MatchListScreen(
 
                                 contentPadding =
                                     PaddingValues(
-                                        vertical = 4.dp,
+                                        top = 4.dp,
                                         bottom = 10.dp
                                     )
                             ) {
