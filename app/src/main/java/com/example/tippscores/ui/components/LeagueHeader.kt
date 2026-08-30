@@ -1,5 +1,6 @@
 package com.example.tippscores.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +18,10 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun LeagueHeader(
     country: String,
-    leagueName: String
+    leagueName: String,
+    flag: String = "",
+    isCollapsed: Boolean = false,
+    onToggleCollapse: () -> Unit = {}
 ) {
 
     val headerColor =
@@ -25,19 +29,19 @@ fun LeagueHeader(
             country.uppercase()
         ) {
 
-            "ENGLAND" ->
+            "ENGLAND", "ANGLIA" ->
                 Color(0xFFEFF6FF)
 
-            "SPAIN" ->
+            "SPAIN", "SPANYOLORSZÁG" ->
                 Color(0xFFFFF7ED)
 
-            "ITALY" ->
+            "ITALY", "OLASZORSZÁG" ->
                 Color(0xFFF0FDF4)
 
-            "GERMANY" ->
+            "GERMANY", "NÉMETORSZÁG" ->
                 Color(0xFFFEF2F2)
 
-            "FRANCE" ->
+            "FRANCE", "FRANCIAORSZÁG" ->
                 Color(0xFFF5F3FF)
 
             else ->
@@ -46,7 +50,9 @@ fun LeagueHeader(
 
     Surface(
         modifier =
-            Modifier.fillMaxWidth(),
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleCollapse),
 
         color =
             headerColor
@@ -70,7 +76,7 @@ fun LeagueHeader(
 
             Text(
                 text =
-                    "🏆 ",
+                    (flag.ifBlank { "🏆" }) + " ",
 
                 fontSize = 11.sp
             )
@@ -108,7 +114,28 @@ fun LeagueHeader(
                 fontSize = 11.sp,
 
                 fontWeight =
-                    FontWeight.Bold
+                    FontWeight.Bold,
+
+                maxLines = 1,
+
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            Text(
+                text =
+                    if (isCollapsed) "▸" else "▾",
+
+                color =
+                    Color(0xFF94A3B8),
+
+                fontSize = 12.sp,
+
+                fontWeight =
+                    FontWeight.Bold,
+
+                modifier =
+                    Modifier.padding(start = 6.dp)
             )
         }
     }

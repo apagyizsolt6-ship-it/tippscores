@@ -3,6 +3,7 @@ package com.example.tippscores.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,7 +34,8 @@ import com.example.tippscores.data.model.Match
 @Composable
 fun MatchRow(
     match: Match,
-    onMatchClick: (String) -> Unit
+    onMatchClick: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit
 ) {
 
     val status =
@@ -101,19 +104,38 @@ fun MatchRow(
                         Alignment.CenterHorizontally
                 ) {
 
-                    Icon(
-                        imageVector =
-                            Icons.Outlined.Star,
-
-                        contentDescription =
-                            "Kedvenc",
-
-                        tint =
-                            Color(0xFF94A3B8),
-
+                    Box(
                         modifier =
-                            Modifier.size(18.dp)
-                    )
+                            Modifier
+                                .size(32.dp)
+                                .clickable {
+                                    onToggleFavorite(match.id)
+                                },
+
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+
+                        Icon(
+                            imageVector =
+                                if (match.isFavorite)
+                                    Icons.Filled.Star
+                                else
+                                    Icons.Outlined.Star,
+
+                            contentDescription =
+                                "Kedvenc",
+
+                            tint =
+                                if (match.isFavorite)
+                                    Color(0xFFF59E0B)
+                                else
+                                    Color(0xFF94A3B8),
+
+                            modifier =
+                                Modifier.size(18.dp)
+                        )
+                    }
 
                     Spacer(
                         modifier =
