@@ -104,6 +104,10 @@ class MainActivity : ComponentActivity() {
                     )
                 },
 
+                onToggleFavorite = { matchId ->
+                    viewModel.toggleFavorite(matchId)
+                },
+
                 onMatchClick = { matchId ->
 
                     // Meccs részletei
