@@ -76,6 +76,61 @@ data class StatpalDailyResponseDto(
 )
 
 // ============================================================
+// KÖZÖS SEGÉDFÜGGVÉNY: "OBJEKTUM VAGY TÖMB" FELOLDÁS
+//
+// A StatPal válaszaiban több helyen is előfordul ugyanaz a minta:
+// ha egy gyűjteményben csak 1 elem van, sima objektumként küldi
+// ("match": {...} / "league": {...}), ha több, akkor tömbként
+// ("match": [{...}, {...}]). Ez a függvény mindkét alakot ugyanúgy
+// egy listává alakítja, hogy sehol ne vesszen el emiatt elem.
+// ============================================================
+
+private fun <T> parseObjectOrArrayList(
+    element: JsonElement?,
+    context: JsonDeserializationContext,
+    classOfT: Class<T>
+): List<T> {
+
+    return when {
+
+        element == null || element.isJsonNull -> {
+            emptyList()
+        }
+
+        element.isJsonArray -> {
+
+            element.asJsonArray.mapNotNull { item ->
+
+                try {
+                    if (!item.isJsonObject) {
+                        null
+                    } else {
+                        context.deserialize<T>(item, classOfT)
+                    }
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+
+        element.isJsonObject -> {
+
+            try {
+                listOf(
+                    context.deserialize<T>(element, classOfT)
+                )
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+
+        else -> {
+            emptyList()
+        }
+    }
+}
+
+// ============================================================
 // STATPAL LEAGUE DESERIALIZER
 // ============================================================
 
@@ -129,52 +184,11 @@ class StatpalLeagueItemDeserializer :
                 }
             }
 
-        val matchElement = obj.get("match")
-
-        val matches = when {
-
-            matchElement == null ||
-                matchElement.isJsonNull -> {
-                emptyList()
-            }
-
-            matchElement.isJsonArray -> {
-
-                matchElement.asJsonArray.mapNotNull { element ->
-
-                    try {
-                        if (!element.isJsonObject) {
-                            null
-                        } else {
-                            context.deserialize(
-                                element,
-                                StatpalMatchItem::class.java
-                            )
-                        }
-                    } catch (_: Exception) {
-                        null
-                    }
-                }
-            }
-
-            matchElement.isJsonObject -> {
-
-                try {
-                    listOf(
-                        context.deserialize(
-                            matchElement,
-                            StatpalMatchItem::class.java
-                        )
-                    )
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            }
-
-            else -> {
-                emptyList()
-            }
-        }
+        val matches = parseObjectOrArrayList(
+            obj.get("match"),
+            context,
+            StatpalMatchItem::class.java
+        )
 
         return StatpalLeagueItem(
             id = id,
@@ -187,6 +201,12 @@ class StatpalLeagueItemDeserializer :
 
 // ============================================================
 // STATPAL DAILY DESERIALIZER
+//
+// A válasz tetején egy vagy több "matches_..." (vagy "live_matches")
+// kulcs is szerepelhet. Korábban csak az elsőt dolgoztuk fel - most
+// mindegyiket összefésüljük, hogy egyetlen bajnokság se maradjon ki.
+// A "league" mezőre is ráteszünk ugyanazt az objektum/tömb védelmet,
+// ami eddig csak a "match" mezőnél volt meg.
 // ============================================================
 
 class StatpalDailyDeserializer :
@@ -204,30 +224,53 @@ class StatpalDailyDeserializer :
 
         val jsonObject = json.asJsonObject
 
-        val key = jsonObject.keySet()
-            .firstOrNull {
-                it.startsWith("matches_") ||
-                    it == "live_matches"
-            }
+        val matchingKeys = jsonObject.keySet().filter {
+            it.startsWith("matches_") || it == "live_matches"
+        }
 
-        if (key == null) {
+        if (matchingKeys.isEmpty()) {
             return StatpalDailyResponseDto(null)
         }
 
-        return try {
+        val mergedLeagues = mutableListOf<StatpalLeagueItem>()
+        var latestUpdated: String? = null
 
-            val dailyData =
-                context.deserialize<StatpalDailyData>(
-                    jsonObject.get(key),
-                    StatpalDailyData::class.java
-                )
+        for (key in matchingKeys) {
 
-            StatpalDailyResponseDto(dailyData)
+            val element = jsonObject.get(key)
+                ?.takeIf { it.isJsonObject }
+                ?.asJsonObject
+                ?: continue
 
-        } catch (_: Exception) {
+            val leaguesForKey = parseObjectOrArrayList(
+                element.get("league"),
+                context,
+                StatpalLeagueItem::class.java
+            )
 
-            StatpalDailyResponseDto(null)
+            mergedLeagues.addAll(leaguesForKey)
+
+            element.get("updated")
+                ?.takeIf { !it.isJsonNull }
+                ?.let {
+                    try {
+                        latestUpdated = it.asString
+                    } catch (_: Exception) {
+                        // marad az előző érték
+                    }
+                }
         }
+
+        if (mergedLeagues.isEmpty()) {
+            return StatpalDailyResponseDto(null)
+        }
+
+        return StatpalDailyResponseDto(
+            StatpalDailyData(
+                updated = latestUpdated,
+                leagues = mergedLeagues
+            )
+        )
     }
 }
 
