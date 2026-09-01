@@ -84,7 +84,7 @@ object CountryLocalizer {
         put("Skócia", "GB", "SCOTLAND")
         put("Wales", "GB", "WALES")
         put("Észak-Írország", "GB", "NORTHERN IRELAND")
-        put("Egyesült Királyság", "GB", "UNITED KINGDOM", "ENGLAND")
+        put("Egyesült Királyság", "GB", "UNITED KINGDOM")
 
         // --- Amerika ---
         put("Argentína", "AR", "ARGENTINA")
@@ -107,7 +107,7 @@ object CountryLocalizer {
         put("Paraguay", "PY", "PARAGUAY")
         put("Peru", "PE", "PERU")
         put("Uruguay", "UY", "URUGUAY")
-        put("Amerikai Egyesült Államok", "US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA")
+        put("USA", "US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA")
         put("Venezuela", "VE", "VENEZUELA")
         put("Trinidad és Tobago", "TT", "TRINIDAD AND TOBAGO")
         put("Haiti", "HT", "HAITI")
