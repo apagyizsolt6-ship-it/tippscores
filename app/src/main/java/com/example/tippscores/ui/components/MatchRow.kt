@@ -1,5 +1,11 @@
 package com.example.tippscores.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -195,7 +202,10 @@ fun MatchRow(
                             match.homeTeam,
 
                         logoUrl =
-                            match.homeTeamLogo
+                            match.homeTeamLogo,
+
+                        justScored =
+                            match.homeJustScored
                     )
 
                     Spacer(
@@ -208,7 +218,10 @@ fun MatchRow(
                             match.awayTeam,
 
                         logoUrl =
-                            match.awayTeamLogo
+                            match.awayTeamLogo,
+
+                        justScored =
+                            match.awayJustScored
                     )
                 }
 
@@ -367,7 +380,8 @@ fun MatchRow(
 @Composable
 private fun TeamItem(
     name: String,
-    logoUrl: String
+    logoUrl: String,
+    justScored: Boolean = false
 ) {
 
     Row(
@@ -424,6 +438,78 @@ private fun TeamItem(
                 FontWeight.SemiBold,
 
             maxLines = 1
+        )
+
+        if (justScored) {
+
+            Spacer(
+                modifier =
+                    Modifier.width(6.dp)
+            )
+
+            GoalFlashBadge()
+        }
+    }
+}
+
+// ================================================================
+// "NAGY ESÉLY" VILLOGÓ JELZÉS (gólesemény, mint az eredmenyek.com-nál)
+// ================================================================
+
+@Composable
+private fun GoalFlashBadge() {
+
+    val infiniteTransition =
+        rememberInfiniteTransition(
+            label = "goalFlash"
+        )
+
+    val flashAlpha by
+        infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.3f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation =
+                        tween(
+                            durationMillis = 550,
+                            easing = LinearEasing
+                        ),
+                    repeatMode =
+                        RepeatMode.Reverse
+                ),
+            label = "goalFlashAlpha"
+        )
+
+    Surface(
+        shape =
+            RoundedCornerShape(5.dp),
+
+        color =
+            Color(0xFFEF4444).copy(
+                alpha = flashAlpha
+            )
+    ) {
+
+        Text(
+            text =
+                "NAGY ESÉLY",
+
+            color =
+                Color.White.copy(
+                    alpha = flashAlpha
+                ),
+
+            fontSize = 8.sp,
+
+            fontWeight =
+                FontWeight.ExtraBold,
+
+            modifier =
+                Modifier.padding(
+                    horizontal = 5.dp,
+                    vertical = 2.dp
+                )
         )
     }
 }
