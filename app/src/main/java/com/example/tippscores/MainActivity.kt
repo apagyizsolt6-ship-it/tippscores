@@ -74,6 +74,12 @@ class MainActivity : ComponentActivity() {
             val selectedOffset by
                 viewModel.selectedOffset.collectAsState()
 
+            val featuredAdditions by
+                viewModel.featuredAdditions.collectAsState()
+
+            val featuredRemovals by
+                viewModel.featuredRemovals.collectAsState()
+
             MatchListScreen(
 
                 matches = matches,
@@ -87,6 +93,10 @@ class MainActivity : ComponentActivity() {
                 highlightlyKey = highlightlyKey,
 
                 selectedOffset = selectedOffset,
+
+                featuredAdditions = featuredAdditions,
+
+                featuredRemovals = featuredRemovals,
 
                 onRefresh = {
                     viewModel.refreshData()
@@ -106,6 +116,10 @@ class MainActivity : ComponentActivity() {
 
                 onToggleFavorite = { matchId ->
                     viewModel.toggleFavorite(matchId)
+                },
+
+                onToggleFeaturedLeague = { leagueKey, isPreset, currentlyFeatured ->
+                    viewModel.toggleFeaturedLeague(leagueKey, isPreset, currentlyFeatured)
                 },
 
                 onMatchClick = { matchId ->
