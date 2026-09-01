@@ -5,12 +5,23 @@ data class Match(
     val leagueName: String,
     val leagueCountry: String,
     val leagueCountryFlag: String = "",
+
+    // -1 = nem alapértelmezett kiemelt bajnokság, 0-4 = az 5 top
+    // bajnokság sorindexe.
+    val presetOrder: Int = -1,
+
     val homeTeam: String,
     val homeTeamLogo: String,
     val awayTeam: String,
     val awayTeamLogo: String,
     val homeScore: Int?,
     val awayScore: Int?,
+
+    // Igaz, ha épp most (az előző frissítéshez képest) született gól
+    // az adott csapatnál.
+    val homeJustScored: Boolean = false,
+    val awayJustScored: Boolean = false,
+
     val status: String, // pl. "LIVE", "72'", "18:30"
     val isLive: Boolean,
 
