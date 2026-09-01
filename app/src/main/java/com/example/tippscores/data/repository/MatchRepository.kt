@@ -5,6 +5,7 @@ import com.example.tippscores.data.local.MatchDao
 import com.example.tippscores.data.local.MatchEntity
 import com.example.tippscores.data.local.toMatch
 import com.example.tippscores.data.localization.CountryLocalizer
+import com.example.tippscores.data.localization.FeaturedLeagues
 import com.example.tippscores.data.localization.LeagueLocalizer
 import com.example.tippscores.data.model.Match
 import com.example.tippscores.data.remote.NetworkModule
@@ -45,6 +46,9 @@ class MatchRepository(
         val safeOffset = offset.coerceIn(-7, 7)
 
         try {
+
+            val previousById = snapshotPreviousMatches()
+
             matchDao.clearMatches()
 
             val response = NetworkModule.statpalApi.getDailyMatches(
@@ -55,7 +59,8 @@ class MatchRepository(
             val entities = buildEntities(
                 leagues = response.data?.leagues.orEmpty(),
                 offsetDays = safeOffset,
-                forceLive = false
+                forceLive = false,
+                previousById = previousById
             )
 
             val sortedEntities = entities.sortedWith(
@@ -109,6 +114,9 @@ class MatchRepository(
         }
 
         try {
+
+            val previousById = snapshotPreviousMatches()
+
             matchDao.clearMatches()
 
             val response = NetworkModule.statpalApi.getLiveMatches(statpalKey)
@@ -116,7 +124,8 @@ class MatchRepository(
             val entities = buildEntities(
                 leagues = response.data?.leagues.orEmpty(),
                 offsetDays = 0,
-                forceLive = true
+                forceLive = true,
+                previousById = previousById
             )
 
             if (entities.isNotEmpty()) {
@@ -146,19 +155,33 @@ class MatchRepository(
     }
 
     // ========================================================
+    // ELŐZŐ ÁLLAPOT PILLANATKÉPE (gólesemény felismeréséhez)
+    // ========================================================
+
+    private suspend fun snapshotPreviousMatches(): Map<String, MatchEntity> {
+        return try {
+            matchDao.getAllMatchesSnapshot().associateBy { it.id }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyMap()
+        }
+    }
+
+    // ========================================================
     // KÖZÖS FELDOLGOZÁS (napi + élő lekérés közös logikája)
     // ========================================================
 
     private fun buildEntities(
         leagues: List<StatpalLeagueItem>,
         offsetDays: Int,
-        forceLive: Boolean
+        forceLive: Boolean,
+        previousById: Map<String, MatchEntity>
     ): List<MatchEntity> {
 
         val result = mutableListOf<MatchEntity>()
 
         leagues.forEach { league ->
-            val (country, flag, leagueName) = resolveLeagueInfo(league)
+            val info = resolveLeagueInfo(league)
 
             league.matches.orEmpty().forEach { match ->
                 val isLive = if (forceLive) true else isLiveStatus(match.status)
@@ -167,20 +190,40 @@ class MatchRepository(
 
                 val matchId = match.mainId
                     ?.takeIf { it.isNotBlank() }
-                    ?: buildFallbackId(match, leagueName)
+                    ?: buildFallbackId(match, info.leagueName)
+
+                val newHomeScore = match.home?.goals?.toIntOrNull()
+                val newAwayScore = match.away?.goals?.toIntOrNull()
+
+                val previous = previousById[matchId]
+
+                val homeJustScored =
+                    previous != null &&
+                        previous.homeScore != null &&
+                        newHomeScore != null &&
+                        newHomeScore > previous.homeScore
+
+                val awayJustScored =
+                    previous != null &&
+                        previous.awayScore != null &&
+                        newAwayScore != null &&
+                        newAwayScore > previous.awayScore
 
                 result.add(
                     MatchEntity(
                         id = matchId,
-                        leagueName = leagueName,
-                        leagueCountry = country,
-                        leagueCountryFlag = flag,
+                        leagueName = info.leagueName,
+                        leagueCountry = info.country,
+                        leagueCountryFlag = info.flag,
+                        presetOrder = info.presetOrder,
                         homeTeam = match.home?.name?.trim()?.takeUnless { it.isEmpty() } ?: "Hazai",
                         homeTeamLogo = "",
                         awayTeam = match.away?.name?.trim()?.takeUnless { it.isEmpty() } ?: "Vendég",
                         awayTeamLogo = "",
-                        homeScore = match.home?.goals?.toIntOrNull(),
-                        awayScore = match.away?.goals?.toIntOrNull(),
+                        homeScore = newHomeScore,
+                        awayScore = newAwayScore,
+                        homeJustScored = homeJustScored,
+                        awayJustScored = awayJustScored,
                         status = status,
                         isLive = isLive,
                         tipPrediction = null,
@@ -196,10 +239,17 @@ class MatchRepository(
     }
 
     // ========================================================
-    // BAJNOKSÁG / ORSZÁG FELOLDÁSA + MAGYARÍTÁS + ZÁSZLÓ
+    // BAJNOKSÁG / ORSZÁG FELOLDÁSA + MAGYARÍTÁS + ZÁSZLÓ + KIEMELÉS
     // ========================================================
 
-    private fun resolveLeagueInfo(league: StatpalLeagueItem): Triple<String, String, String> {
+    private data class ResolvedLeagueInfo(
+        val country: String,
+        val flag: String,
+        val leagueName: String,
+        val presetOrder: Int
+    )
+
+    private fun resolveLeagueInfo(league: StatpalLeagueItem): ResolvedLeagueInfo {
         val countryAndLeague = league.name?.trim()?.takeUnless { it.isEmpty() } ?: "Bajnokság"
 
         val parts = countryAndLeague.split(":", limit = 2)
@@ -218,23 +268,26 @@ class MatchRepository(
 
         val country = CountryLocalizer.hungarianName(rawCountry)
         val flag = CountryLocalizer.flagEmoji(rawCountry)
-        val leagueName = LeagueLocalizer.hungarianLeagueName(rawLeagueName)
 
-        return Triple(country, flag, leagueName)
+        val leagueName = FeaturedLeagues.displayNameOverride(rawCountry, rawLeagueName)
+            ?: LeagueLocalizer.hungarianLeagueName(rawLeagueName)
+
+        val presetOrder = FeaturedLeagues.presetOrder(rawCountry, rawLeagueName)
+
+        return ResolvedLeagueInfo(
+            country = country,
+            flag = flag,
+            leagueName = leagueName,
+            presetOrder = presetOrder
+        )
     }
 
     // ========================================================
     // IDŐZÓNA: UTC KEZDÉSI IDŐ -> ESZKÖZ HELYI IDEJE
     //
-    // Feltételezés: a StatPal UTC-ben adja a kezdési időt (ez a
-    // legelterjedtebb konvenció sportadat API-knál, és ez magyarázza
-    // pontosan a jelentett "2 óra csúszást" is nyáron, CEST idő
-    // szerint). Ha ez a feltételezés mégsem lenne pontos, ezen az
-    // egyetlen függvényen kell módosítani.
-    //
-    // A tényleges naptári napot (offsetDays) használjuk az eltolás
-    // kiszámításához, így a nyári/téli időszámítás (DST) is helyesen
-    // kezelve van, nem egy fix +2 órás eltolással dolgozunk.
+    // Feltételezés: a StatPal UTC-ben adja a kezdési időt. A tényleges
+    // naptári napot (offsetDays) használjuk az eltolás kiszámításához,
+    // így a nyári/téli időszámítás (DST) is helyesen kezelve van.
     // ========================================================
 
     private fun convertUtcTimeToLocal(rawTime: String?, offsetDays: Int): String? {
