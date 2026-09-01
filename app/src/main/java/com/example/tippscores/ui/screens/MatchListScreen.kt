@@ -54,6 +54,7 @@ import com.example.tippscores.ui.components.LeagueHeader
 import com.example.tippscores.ui.components.MatchRow
 import com.example.tippscores.ui.components.SettingsDialog
 import kotlinx.coroutines.delay
+import java.text.Collator
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -78,10 +79,13 @@ fun MatchListScreen(
     statpalKey: String,
     highlightlyKey: String,
     selectedOffset: Int,
+    featuredAdditions: Set<String>,
+    featuredRemovals: Set<String>,
     onRefresh: () -> Unit,
     onDateSelected: (Int) -> Unit,
     onSaveKeys: (String, String) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onToggleFeaturedLeague: (String, Boolean, Boolean) -> Unit,
     onMatchClick: (String) -> Unit
 ) {
 
@@ -207,6 +211,43 @@ fun MatchListScreen(
 
     val visibleGroupKeys =
         displayedMatches.map { groupKey(it) }.toSet()
+
+    // ========================================================
+    // KIEMELT BAJNOKSÁGOK: RENDEZÉS + ÁLLAPOT
+    //
+    // A magyar ékezetes betűk (Á, É, Ö, Ő, Ü, Ű, stb.) a sima
+    // szöveges rendezésnél a végére kerülnének - a Collator ezt
+    // a magyar ábécének megfelelően kezeli.
+    // ========================================================
+
+    val hunCollator =
+        remember {
+            Collator.getInstance(Locale("hu", "HU"))
+        }
+
+    val hunComparator =
+        remember(hunCollator) {
+            Comparator<String> { a, b -> hunCollator.compare(a, b) }
+        }
+
+    fun isLeagueFeatured(key: String, presetOrder: Int): Boolean =
+        (presetOrder >= 0 && key !in featuredRemovals) || (key in featuredAdditions)
+
+    fun featuredSortBucket(key: String, presetOrder: Int): Int =
+        when {
+            isLeagueFeatured(key, presetOrder) && presetOrder >= 0 -> presetOrder
+            isLeagueFeatured(key, presetOrder) -> 100
+            else -> 200
+        }
+
+    fun sortLeagueGroups(
+        groups: List<Pair<String, List<Match>>>
+    ): List<Pair<String, List<Match>>> =
+        groups.sortedWith(
+            compareBy<Pair<String, List<Match>>> { (key, list) ->
+                featuredSortBucket(key, list.first().presetOrder)
+            }.thenBy(hunComparator) { it.first }
+        )
 
     // ========================================================
     // FŐ KÉPERNYŐ
@@ -952,10 +993,11 @@ fun MatchListScreen(
                         } else {
 
                             val leagueGroups =
-                                searched
-                                    .groupBy { groupKey(it) }
-                                    .toList()
-                                    .sortedBy { it.first }
+                                sortLeagueGroups(
+                                    searched
+                                        .groupBy { groupKey(it) }
+                                        .toList()
+                                )
 
                             LazyColumn(
                                 modifier =
@@ -975,6 +1017,9 @@ fun MatchListScreen(
 
                                     val first = group.first()
 
+                                    val featured =
+                                        isLeagueFeatured(key, first.presetOrder)
+
                                     Surface(
                                         modifier =
                                             Modifier
@@ -985,7 +1030,7 @@ fun MatchListScreen(
                                                 },
 
                                         color =
-                                            Color.White
+                                            if (featured) Color(0xFFEFF6FF) else Color.White
                                     ) {
 
                                         Column {
@@ -1031,6 +1076,29 @@ fun MatchListScreen(
                                                         color = Color(0xFF0F172A)
                                                     )
                                                 }
+
+                                                Text(
+                                                    text =
+                                                        if (featured) "★" else "☆",
+
+                                                    color =
+                                                        if (featured) Color(0xFFF59E0B) else Color(0xFF94A3B8),
+
+                                                    fontSize = 17.sp,
+
+                                                    fontWeight = FontWeight.Bold,
+
+                                                    modifier =
+                                                        Modifier
+                                                            .padding(horizontal = 8.dp)
+                                                            .clickable {
+                                                                onToggleFeaturedLeague(
+                                                                    key,
+                                                                    first.presetOrder >= 0,
+                                                                    featured
+                                                                )
+                                                            }
+                                                )
 
                                                 Surface(
                                                     shape = RoundedCornerShape(8.dp),
@@ -1135,12 +1203,11 @@ fun MatchListScreen(
                     else -> {
 
                         val grouped =
-                            displayedMatches
-                                .groupBy { groupKey(it) }
-                                .toList()
-                                .sortedBy {
-                                    it.first
-                                }
+                            sortLeagueGroups(
+                                displayedMatches
+                                    .groupBy { groupKey(it) }
+                                    .toList()
+                            )
 
                         LazyColumn(
 
@@ -1155,6 +1222,12 @@ fun MatchListScreen(
 
                             grouped.forEach {
                                 (key, matchGroup) ->
+
+                                val leagueFeatured =
+                                    isLeagueFeatured(
+                                        key,
+                                        matchGroup.first().presetOrder
+                                    )
 
                                 stickyHeader {
 
@@ -1178,6 +1251,9 @@ fun MatchListScreen(
                                         isCollapsed =
                                             key in collapsedLeagues,
 
+                                        isFeatured =
+                                            leagueFeatured,
+
                                         onToggleCollapse = {
                                             collapsedLeagues =
                                                 if (key in collapsedLeagues) {
@@ -1185,6 +1261,14 @@ fun MatchListScreen(
                                                 } else {
                                                     collapsedLeagues + key
                                                 }
+                                        },
+
+                                        onToggleFeatured = {
+                                            onToggleFeaturedLeague(
+                                                key,
+                                                matchGroup.first().presetOrder >= 0,
+                                                leagueFeatured
+                                            )
                                         }
                                     )
                                 }
