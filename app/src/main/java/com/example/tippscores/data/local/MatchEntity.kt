@@ -10,12 +10,24 @@ data class MatchEntity(
     val leagueName: String,
     val leagueCountry: String,
     val leagueCountryFlag: String = "",
+
+    // -1 = nem alapértelmezett kiemelt bajnokság, 0-4 = az 5 top
+    // bajnokság sorindexe (Anglia, Németország, Franciaország,
+    // Olaszország, Spanyolország sorrendben).
+    val presetOrder: Int = -1,
+
     val homeTeam: String,
     val homeTeamLogo: String,
     val awayTeam: String,
     val awayTeamLogo: String,
     val homeScore: Int?,
     val awayScore: Int?,
+
+    // Igaz, ha az ELŐZŐ frissítéshez képest nőtt az adott csapat
+    // gólszáma (vagyis épp most született gól nála).
+    val homeJustScored: Boolean = false,
+    val awayJustScored: Boolean = false,
+
     val status: String,
     val isLive: Boolean,
     val tipPrediction: String?,
@@ -30,12 +42,15 @@ fun MatchEntity.toMatch() = Match(
     leagueName = leagueName,
     leagueCountry = leagueCountry,
     leagueCountryFlag = leagueCountryFlag,
+    presetOrder = presetOrder,
     homeTeam = homeTeam,
     homeTeamLogo = homeTeamLogo,
     awayTeam = awayTeam,
     awayTeamLogo = awayTeamLogo,
     homeScore = homeScore,
     awayScore = awayScore,
+    homeJustScored = homeJustScored,
+    awayJustScored = awayJustScored,
     status = status,
     isLive = isLive,
     tipPrediction = tipPrediction,

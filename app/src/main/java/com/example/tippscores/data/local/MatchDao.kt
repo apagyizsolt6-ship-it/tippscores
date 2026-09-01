@@ -11,6 +11,13 @@ interface MatchDao {
     @Query("SELECT * FROM matches")
     fun getAllMatches(): Flow<List<MatchEntity>>
 
+    // Egyszeri (nem Flow) lekérdezés - ez kell ahhoz, hogy egy új
+    // frissítés előtt megnézhessük a RÉGI állást (pl. gólesemény
+    // felismeréséhez: nőtt-e valamelyik csapat gólszáma az előző
+    // frissítés óta).
+    @Query("SELECT * FROM matches")
+    suspend fun getAllMatchesSnapshot(): List<MatchEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMatches(matches: List<MatchEntity>)
 
