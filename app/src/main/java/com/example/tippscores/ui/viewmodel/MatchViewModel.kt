@@ -33,6 +33,29 @@ class MatchViewModel(
     }
 
     // ========================================================
+    // KIEMELT BAJNOKSÁGOK (az 5 alapértelmezett + a felhasználó
+    // saját kiemelései/visszavonásai)
+    // ========================================================
+
+    private val _featuredAdditions =
+        MutableStateFlow(apiPreferences.featuredLeagueAdditions)
+
+    val featuredAdditions: StateFlow<Set<String>> =
+        _featuredAdditions
+
+    private val _featuredRemovals =
+        MutableStateFlow(apiPreferences.featuredLeagueRemovals)
+
+    val featuredRemovals: StateFlow<Set<String>> =
+        _featuredRemovals
+
+    fun toggleFeaturedLeague(leagueKey: String, isPreset: Boolean, currentlyFeatured: Boolean) {
+        apiPreferences.toggleFeaturedLeague(leagueKey, isPreset, currentlyFeatured)
+        _featuredAdditions.value = apiPreferences.featuredLeagueAdditions
+        _featuredRemovals.value = apiPreferences.featuredLeagueRemovals
+    }
+
+    // ========================================================
     // MÉRKŐZÉSEK (a nyers lista + a kedvenc-jelölés összefésülve)
     // ========================================================
 
