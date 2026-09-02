@@ -186,7 +186,13 @@ class MatchRepository(
             league.matches.orEmpty().forEach { match ->
                 val isLive = if (forceLive) true else isLiveStatus(match.status)
                 val localTime = convertUtcTimeToLocal(match.time, offsetDays)
-                val status = displayStatus(match.status, localTime)
+                val status = displayStatus(
+                    rawStatus = match.status,
+                    localTime = localTime,
+                    rawDate = match.date,
+                    rawTime = match.time,
+                    isLive = isLive
+                )
 
                 val matchId = match.mainId
                     ?.takeIf { it.isNotBlank() }
@@ -217,9 +223,9 @@ class MatchRepository(
                         leagueCountryFlag = info.flag,
                         presetOrder = info.presetOrder,
                         homeTeam = match.home?.name?.trim()?.takeUnless { it.isEmpty() } ?: "Hazai",
-                        homeTeamLogo = "",
+                        homeTeamLogo = match.home?.logoUrl?.trim().orEmpty(),
                         awayTeam = match.away?.name?.trim()?.takeUnless { it.isEmpty() } ?: "Vendég",
-                        awayTeamLogo = "",
+                        awayTeamLogo = match.away?.logoUrl?.trim().orEmpty(),
                         homeScore = newHomeScore,
                         awayScore = newAwayScore,
                         homeJustScored = homeJustScored,
@@ -312,9 +318,15 @@ class MatchRepository(
     // STÁTUSZ MAGYARÍTÁS
     // ========================================================
 
-    private fun displayStatus(status: String?, time: String?): String {
-        val normalized = status?.trim()?.uppercase(Locale.getDefault()).orEmpty()
-        val normalizedTime = time?.trim().orEmpty()
+    private fun displayStatus(
+        rawStatus: String?,
+        localTime: String?,
+        rawDate: String?,
+        rawTime: String?,
+        isLive: Boolean
+    ): String {
+        val normalized = rawStatus?.trim()?.uppercase(Locale.getDefault()).orEmpty()
+        val normalizedTime = localTime?.trim().orEmpty()
 
         return when {
             normalized.contains("POST") || normalized.contains("POSTP") -> "Elhalasztva"
@@ -322,12 +334,48 @@ class MatchRepository(
             normalized == "AET" -> "Hosszabbítás"
             normalized == "PEN" -> "Tizenegyesek"
             normalized == "FT" || normalized == "FINISHED" -> "Vége"
-            normalized == "HT" -> "Szünet"
-            isLiveStatus(status) -> normalizedTime.ifEmpty { "ÉLŐ" }
+            normalized == "HT" -> "SZÜNET"
+            isLive -> {
+                extractLiveMinute(normalized)?.let { "$it'" }
+                    ?: calculateLiveMinute(normalizedTime)
+                    ?: "1'"
+            }
             normalizedTime.isNotEmpty() -> normalizedTime
             normalized.isNotEmpty() -> normalized
             else -> "–"
         }
+    }
+
+    private fun extractLiveMinute(status: String): Int? {
+        val match = Regex("^(\\d{1,3})'?").find(status) ?: return null
+        return match.groupValues[1].toIntOrNull()?.coerceIn(1, 130)
+    }
+
+    /**
+     * Ha a live végpont csak LIVE/1H/2H státuszt ad, a kezdési időből
+     * számítjuk az aktuális percet. Így az UI-ban nem "ÉLŐ" jelenik meg,
+     * hanem pl. 37', 64' vagy 90'.
+     */
+    private fun calculateLiveMinute(localTime: String?): String? {
+        val timeMatch = Regex("^(\\d{1,2}):(\\d{2})").find(localTime?.trim().orEmpty())
+            ?: return null
+
+        val hour = timeMatch.groupValues[1].toIntOrNull() ?: return null
+        val minute = timeMatch.groupValues[2].toIntOrNull() ?: return null
+
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val elapsedMinutes = ((System.currentTimeMillis() - calendar.timeInMillis) / 60000L)
+            .toInt()
+
+        if (elapsedMinutes < 1 || elapsedMinutes > 130) return null
+
+        return elapsedMinutes.coerceIn(1, 130).toString() + "'"
     }
 
     // ========================================================
