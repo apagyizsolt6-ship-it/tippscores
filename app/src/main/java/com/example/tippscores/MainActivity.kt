@@ -25,6 +25,7 @@ import androidx.work.WorkManager
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.local.AppDatabase
 import com.example.tippscores.data.repository.MatchRepository
+import com.example.tippscores.data.repository.TeamProfileRepository
 import com.example.tippscores.notifications.GoalCheckWorker
 import com.example.tippscores.ui.screens.MatchDetailScreen
 import com.example.tippscores.ui.screens.MatchListScreen
@@ -47,6 +48,10 @@ class MainActivity : ComponentActivity() {
             database.matchDao(),
             apiPreferences
         )
+    }
+
+    private val teamProfileRepository by lazy {
+        TeamProfileRepository { apiPreferences.highlightlyApiKey }
     }
 
     private val detailsRepository by lazy {
@@ -187,6 +192,16 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf<String?>(null)
                 }
 
+            var selectedTeamName by
+                remember {
+                    mutableStateOf<String?>(null)
+                }
+
+            var selectedTeamLogo by
+                remember {
+                    mutableStateOf("")
+                }
+
             MaterialTheme(
                 colorScheme =
                     if (darkMode) darkColorScheme() else lightColorScheme()
@@ -198,7 +213,21 @@ class MainActivity : ComponentActivity() {
 
                     val currentMatchId = selectedMatchId
 
-                    if (currentMatchId != null) {
+                    val currentTeamName = selectedTeamName
+
+                    if (currentTeamName != null) {
+
+                        TeamProfileScreen(
+                            teamName = currentTeamName,
+                            fallbackLogoUrl = selectedTeamLogo,
+                            repository = teamProfileRepository,
+                            onBack = {
+                                selectedTeamName = null
+                                selectedTeamLogo = ""
+                            }
+                        )
+
+                    } else if (currentMatchId != null) {
 
                         MatchDetailScreen(
 
@@ -232,6 +261,11 @@ class MainActivity : ComponentActivity() {
 
                             onToggleFollowTeam = { teamName ->
                                 viewModel.toggleFavoriteTeam(teamName)
+                            },
+
+                            onTeamClick = { teamName, logoUrl ->
+                                selectedTeamName = teamName
+                                selectedTeamLogo = logoUrl
                             }
                         )
 
