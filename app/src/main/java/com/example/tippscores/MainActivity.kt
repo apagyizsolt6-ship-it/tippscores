@@ -49,6 +49,12 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val detailsRepository by lazy {
+        com.example.tippscores.data.repository.MatchDetailsRepository {
+            apiPreferences.statpalApiKey
+        }
+    }
+
     private val viewModel: MatchViewModel by viewModels {
 
         object : ViewModelProvider.Factory {
@@ -61,7 +67,8 @@ class MainActivity : ComponentActivity() {
 
                 return MatchViewModel(
                     repository = repository,
-                    apiPreferences = apiPreferences
+                    apiPreferences = apiPreferences,
+                    detailsRepository = detailsRepository
                 ) as T
             }
         }
@@ -150,6 +157,15 @@ class MainActivity : ComponentActivity() {
             val selectedOffset by
                 viewModel.selectedOffset.collectAsState()
 
+            val matchDetails by
+                viewModel.matchDetails.collectAsState()
+
+            val detailsLoading by
+                viewModel.detailsLoading.collectAsState()
+
+            val detailsError by
+                viewModel.detailsError.collectAsState()
+
             val featuredAdditions by
                 viewModel.featuredAdditions.collectAsState()
 
@@ -188,10 +204,24 @@ class MainActivity : ComponentActivity() {
                             match =
                                 matches.find { it.id == currentMatchId },
 
+                            details =
+                                matchDetails,
+
+                            detailsLoading =
+                                detailsLoading,
+
+                            detailsError =
+                                detailsError,
+
+                            onRetryDetails = {
+                                viewModel.retryMatchDetails()
+                            },
+
                             favoriteTeamNames =
                                 favoriteTeamNames,
 
                             onBack = {
+                                viewModel.clearMatchDetails()
                                 selectedMatchId = null
                             },
 
@@ -273,6 +303,9 @@ class MainActivity : ComponentActivity() {
 
                             onMatchClick = { matchId ->
                                 selectedMatchId = matchId
+                                matches.find { it.id == matchId }?.let {
+                                    viewModel.openMatchDetails(it)
+                                }
                             }
                         )
                     }
