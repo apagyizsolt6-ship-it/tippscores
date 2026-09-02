@@ -5,7 +5,8 @@ data class MatchDetails(
     val events: List<MatchEvent> = emptyList(),
     val homeLineup: MatchLineup = MatchLineup(),
     val awayLineup: MatchLineup = MatchLineup(),
-    val headToHead: List<HeadToHeadMatch> = emptyList()
+    val headToHead: List<HeadToHeadMatch> = emptyList(),
+    val highlight: MatchHighlight? = null
 ) {
     val hasStatistics: Boolean get() = statistics.isNotEmpty()
     val hasEvents: Boolean get() = events.isNotEmpty()
@@ -54,4 +55,15 @@ data class LineupPlayer(
     val position: String? = null,
     val photoUrl: String? = null,
     val isCaptain: Boolean = false
+)
+
+
+data class MatchHighlight(
+    val id: String = "",
+    val title: String = "",
+    val url: String? = null,
+    val embedUrl: String? = null,
+    val imageUrl: String? = null,
+    val description: String? = null,
+    val type: String? = null
 )
