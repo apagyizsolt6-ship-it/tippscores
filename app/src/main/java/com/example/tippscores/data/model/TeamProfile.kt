@@ -8,7 +8,8 @@ data class TeamProfile(
     val country: String? = null,
     val league: String? = null,
     val statistics: List<TeamProfileStatistic> = emptyList(),
-    val recentMatches: List<TeamRecentMatch> = emptyList()
+    val recentMatches: List<TeamRecentMatch> = emptyList(),
+    val form: List<TeamFormItem> = emptyList()
 )
 
 data class TeamProfileStatistic(
@@ -25,4 +26,12 @@ data class TeamRecentMatch(
     val homeScore: String = "-",
     val awayScore: String = "-",
     val result: String = "-"
+)
+
+
+data class TeamFormItem(
+    val result: String,
+    val label: String,
+    val score: String,
+    val opponent: String
 )
