@@ -18,8 +18,7 @@ class MatchViewModel(
 ) : ViewModel() {
 
     // ========================================================
-    // KEDVENCEK (a csillag a mérkőzéssoron - SharedPreferences-ben
-    // tárolva, mert a "matches" tábla minden frissítéskor törlődik)
+    // KEDVENC MECCSEK (a csillag a mérkőzéssoron)
     // ========================================================
 
     private val _favoriteIds =
@@ -30,6 +29,20 @@ class MatchViewModel(
 
     fun toggleFavorite(matchId: String) {
         _favoriteIds.value = apiPreferences.toggleFavoriteMatch(matchId)
+    }
+
+    // ========================================================
+    // KEDVENC CSAPATOK (csapat követése minden napra)
+    // ========================================================
+
+    private val _favoriteTeamNames =
+        MutableStateFlow(apiPreferences.favoriteTeamNames)
+
+    val favoriteTeamNames: StateFlow<Set<String>> =
+        _favoriteTeamNames
+
+    fun toggleFavoriteTeam(teamName: String) {
+        _favoriteTeamNames.value = apiPreferences.toggleFavoriteTeam(teamName)
     }
 
     // ========================================================
@@ -56,12 +69,52 @@ class MatchViewModel(
     }
 
     // ========================================================
-    // MÉRKŐZÉSEK (a nyers lista + a kedvenc-jelölés összefésülve)
+    // SÖTÉT MÓD
+    // ========================================================
+
+    private val _darkMode =
+        MutableStateFlow(apiPreferences.darkModeEnabled)
+
+    val darkMode: StateFlow<Boolean> =
+        _darkMode
+
+    fun setDarkMode(enabled: Boolean) {
+        apiPreferences.darkModeEnabled = enabled
+        _darkMode.value = enabled
+    }
+
+    // ========================================================
+    // PUSH ÉRTESÍTÉS GÓLNÁL
+    // ========================================================
+
+    private val _goalNotificationsEnabled =
+        MutableStateFlow(apiPreferences.goalNotificationsEnabled)
+
+    val goalNotificationsEnabled: StateFlow<Boolean> =
+        _goalNotificationsEnabled
+
+    fun setGoalNotificationsEnabled(enabled: Boolean) {
+        apiPreferences.goalNotificationsEnabled = enabled
+        _goalNotificationsEnabled.value = enabled
+    }
+
+    // ========================================================
+    // MÉRKŐZÉSEK (a nyers lista + kedvenc-jelölés + csapatkövetés)
     // ========================================================
 
     val matches: StateFlow<List<Match>> =
-        combine(repository.allMatches, _favoriteIds) { list, favIds ->
-            list.map { it.copy(isFavorite = favIds.contains(it.id)) }
+        combine(
+            repository.allMatches,
+            _favoriteIds,
+            _favoriteTeamNames
+        ) { list, favIds, favTeams ->
+            list.map {
+                it.copy(
+                    isFavorite = favIds.contains(it.id),
+                    isHomeTeamFollowed = favTeams.contains(it.homeTeam),
+                    isAwayTeamFollowed = favTeams.contains(it.awayTeam)
+                )
+            }
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
