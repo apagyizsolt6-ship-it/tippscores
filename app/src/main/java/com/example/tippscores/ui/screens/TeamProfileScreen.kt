@@ -142,6 +142,56 @@ fun TeamProfileScreen(
                     }
                 }
             } else {
+                if (profile?.form.orEmpty().isNotEmpty()) {
+                    item {
+                        SectionCard(title = "Forma – utolsó 5", colors = colors) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                profile!!.form.take(5).forEach { item ->
+                                    Surface(
+                                        modifier = Modifier.size(44.dp),
+                                        shape = CircleShape,
+                                        color = when (item.result) {
+                                            "GY" -> Color(0xFFD1FAE5)
+                                            "V" -> Color(0xFFFEE2E2)
+                                            "D" -> Color(0xFFFEF3C7)
+                                            else -> colors.cardBackground
+                                        }
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = item.result,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color.Black
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            profile!!.form.take(5).forEach { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 5.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(item.label, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Text(item.opponent, color = colors.tertiaryText, fontSize = 10.sp)
+                                    }
+                                    Text(item.score, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (profile?.statistics.orEmpty().isNotEmpty()) {
                     item {
                         SectionCard(title = "Szezonstatisztikák", colors = colors) {
