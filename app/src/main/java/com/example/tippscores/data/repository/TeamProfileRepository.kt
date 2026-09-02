@@ -3,6 +3,7 @@ package com.example.tippscores.data.repository
 import com.example.tippscores.data.model.TeamProfile
 import com.example.tippscores.data.model.TeamProfileStatistic
 import com.example.tippscores.data.model.TeamRecentMatch
+import com.example.tippscores.data.model.TeamFormItem
 import com.example.tippscores.data.remote.NetworkModule
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -64,7 +65,8 @@ class TeamProfileRepository(
                 country = countryName(profile),
                 league = firstString(profile, "league", "leagueName"),
                 statistics = parseStatistics(stats),
-                recentMatches = parseRecentMatches(lastFive, teamName)
+                recentMatches = parseRecentMatches(lastFive, teamName),
+                form = parseForm(lastFive, teamName)
             )
         } catch (_: Exception) {
             null
@@ -130,6 +132,22 @@ class TeamProfileRepository(
                 result = result
             )
         }.take(5)
+    }
+
+    private fun parseForm(element: JsonElement?, teamName: String): List<TeamFormItem> {
+        return parseRecentMatches(element, teamName).take(5).map { match ->
+            TeamFormItem(
+                result = match.result,
+                label = when (match.result) {
+                    "GY" -> "Győzelem"
+                    "D" -> "Döntetlen"
+                    "V" -> "Vereség"
+                    else -> "Ismeretlen"
+                },
+                score = "${match.homeScore} – ${match.awayScore}",
+                opponent = match.opponent
+            )
+        }
     }
 
     private fun scoreValue(obj: JsonObject, teamKey: String): String? {
