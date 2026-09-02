@@ -1,5 +1,6 @@
 package com.example.tippscores.data.repository
 
+import com.example.tippscores.data.model.HeadToHeadMatch
 import com.example.tippscores.data.model.LineupPlayer
 import com.example.tippscores.data.model.MatchDetails
 import com.example.tippscores.data.model.MatchEvent
@@ -43,8 +44,6 @@ class MatchDetailsRepository(
 
         val h = highlightly.await()
 
-        val boxScoreElement = h?.id?.let { fetchHighlightlyBoxScore(it) }
-
         val highlightlyStatistics = h?.details?.let { parseHighlightlyStatistics(it) }
             .orEmpty()
             .ifEmpty {
@@ -64,8 +63,8 @@ class MatchDetailsRepository(
 
         val highlightlyLineups = h?.details?.let {
             Pair(
-                enrichLineupPhotos(parseLineupFromMatchObject(it, homeTeam, true), boxScoreElement),
-                enrichLineupPhotos(parseLineupFromMatchObject(it, awayTeam, false), boxScoreElement)
+                parseLineupFromMatchObject(it, homeTeam, true),
+                parseLineupFromMatchObject(it, awayTeam, false)
             )
         }
 
@@ -103,7 +102,8 @@ class MatchDetailsRepository(
                     rostersJson = statpalLineups.await(),
                     homeTeam = homeTeam,
                     awayTeam = awayTeam
-                ).awayLineup
+                ).awayLineup,
+            headToHead = h?.headToHead.orEmpty()
         )
     }
 
@@ -111,7 +111,8 @@ class MatchDetailsRepository(
         val id: String,
         val details: JsonObject?,
         val statistics: JsonElement?,
-        val events: JsonElement?
+        val events: JsonElement?,
+        val headToHead: List<HeadToHeadMatch> = emptyList()
     )
 
     private suspend fun fetchHighlightlyMatch(
@@ -161,11 +162,24 @@ class MatchDetailsRepository(
                 details?.get("events")
             }
 
+            val h2h = try {
+                val homeId = candidate?.homeTeam?.id
+                val awayId = candidate?.awayTeam?.id
+                if (!homeId.isNullOrBlank() && !awayId.isNullOrBlank()) {
+                    parseHeadToHead(
+                        NetworkModule.highlightlyApi.getHeadToHead(key, homeId, awayId)
+                    )
+                } else emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+
             HighlightlyMatchDetails(
                 id = id,
                 details = details,
                 statistics = statistics,
-                events = events
+                events = events,
+                headToHead = h2h
             )
         } catch (_: HttpException) {
             null
@@ -174,31 +188,36 @@ class MatchDetailsRepository(
         }
     }
 
-    private suspend fun fetchHighlightlyBoxScore(matchId: String): JsonElement? {
-        val key = highlightlyKeyProvider().trim()
-        if (key.isEmpty()) return null
-        return try { NetworkModule.highlightlyApi.getBoxScore(key, matchId) } catch (_: Exception) { null }
-    }
+    private fun parseHeadToHead(element: JsonElement): List<HeadToHeadMatch> {
+        val array = when {
+            element.isJsonArray -> element.asJsonArray
+            element.isJsonObject && element.asJsonObject.get("data")?.isJsonArray == true ->
+                element.asJsonObject.getAsJsonArray("data")
+            else -> return emptyList()
+        }
 
-    private fun enrichLineupPhotos(lineup: MatchLineup, boxScore: JsonElement?): MatchLineup {
-        if (!lineup.hasPlayers() || boxScore == null) return lineup
-        val photos = mutableMapOf<String, String>()
-        collectPlayerPhotos(boxScore, photos)
-        if (photos.isEmpty()) return lineup
-        fun enrich(list: List<LineupPlayer>) = list.map { p -> p.copy(photoUrl = p.photoUrl?.takeIf { it.isNotBlank() } ?: photos[normalize(p.name)]) }
-        return lineup.copy(startingPlayers = enrich(lineup.startingPlayers), substitutePlayers = enrich(lineup.substitutePlayers))
-    }
+        return array.mapNotNull { item ->
+            if (!item.isJsonObject) return@mapNotNull null
+            val obj = item.asJsonObject
+            val home = obj.getAsJsonObject("homeTeam") ?: return@mapNotNull null
+            val away = obj.getAsJsonObject("awayTeam") ?: return@mapNotNull null
+            val homeName = string(home, "name") ?: return@mapNotNull null
+            val awayName = string(away, "name") ?: return@mapNotNull null
+            val state = obj.getAsJsonObject("state")
+            val score = state?.getAsJsonObject("score")
+            val current = score?.let { string(it, "current") }
+            val parts = current?.split("-")?.map { it.trim() }.orEmpty()
 
-    private fun collectPlayerPhotos(element: JsonElement?, out: MutableMap<String, String>) {
-        if (element == null || element.isJsonNull) return
-        if (element.isJsonArray) { element.asJsonArray.forEach { collectPlayerPhotos(it, out) }; return }
-        if (!element.isJsonObject) return
-        val obj = element.asJsonObject
-        val player = obj.get("player")?.takeIf { it.isJsonObject }?.asJsonObject
-        val name = firstString(obj, "name", "player_name", "playerName", "full_name") ?: player?.let { firstString(it, "name", "full_name", "fullName") }
-        val photo = firstString(obj, "logo", "photo", "photo_url", "photoUrl", "image", "image_url", "avatar") ?: player?.let { firstString(it, "logo", "photo", "photo_url", "photoUrl", "image", "image_url", "avatar") }
-        if (!name.isNullOrBlank() && !photo.isNullOrBlank()) out[normalize(name)] = photo
-        obj.entrySet().forEach { (_, child) -> collectPlayerPhotos(child, out) }
+            HeadToHeadMatch(
+                date = string(obj, "date") ?: "",
+                homeTeam = homeName,
+                awayTeam = awayName,
+                homeScore = parts.getOrNull(0) ?: "-",
+                awayScore = parts.getOrNull(1) ?: "-",
+                homeLogoUrl = string(home, "logo") ?: "",
+                awayLogoUrl = string(away, "logo") ?: ""
+            )
+        }.take(10)
     }
 
     private fun parseHighlightlyStatistics(root: JsonObject): List<MatchStatistic> {
