@@ -53,6 +53,7 @@ import com.example.tippscores.data.model.Match
 import com.example.tippscores.ui.components.LeagueHeader
 import com.example.tippscores.ui.components.MatchRow
 import com.example.tippscores.ui.components.SettingsDialog
+import com.example.tippscores.ui.theme.LocalAppColors
 import kotlinx.coroutines.delay
 import java.text.Collator
 import java.text.SimpleDateFormat
@@ -81,13 +82,20 @@ fun MatchListScreen(
     selectedOffset: Int,
     featuredAdditions: Set<String>,
     featuredRemovals: Set<String>,
+    darkMode: Boolean,
+    goalNotificationsEnabled: Boolean,
     onRefresh: () -> Unit,
     onDateSelected: (Int) -> Unit,
     onSaveKeys: (String, String) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onToggleFollowTeam: (String) -> Unit,
     onToggleFeaturedLeague: (String, Boolean, Boolean) -> Unit,
+    onDarkModeChange: (Boolean) -> Unit,
+    onGoalNotificationsChange: (Boolean) -> Unit,
     onMatchClick: (String) -> Unit
 ) {
+
+    val colors = LocalAppColors.current
 
     var showSettingsDialog by
         remember {
@@ -128,9 +136,21 @@ fun MatchListScreen(
             initialHighlightlyKey =
                 highlightlyKey,
 
+            darkModeEnabled =
+                darkMode,
+
+            goalNotificationsEnabled =
+                goalNotificationsEnabled,
+
             onDismiss = {
                 showSettingsDialog = false
             },
+
+            onDarkModeChange =
+                onDarkModeChange,
+
+            onGoalNotificationsChange =
+                onGoalNotificationsChange,
 
             onSave = { sKey, hKey ->
 
@@ -200,7 +220,7 @@ fun MatchListScreen(
     val tabFiltered =
         when (selectedTab) {
             BottomTab.LIVE -> searched.filter { it.isLive }
-            BottomTab.FAVORITES -> searched.filter { it.isFavorite }
+            BottomTab.FAVORITES -> searched.filter { it.isFavorite || it.isHomeTeamFollowed || it.isAwayTeamFollowed }
             BottomTab.ALL, BottomTab.LEAGUES -> searched
         }
 
@@ -256,10 +276,7 @@ fun MatchListScreen(
     Scaffold(
 
         containerColor =
-            Color(0xFFF5F7FB),
-
-        // ====================================================
-        // FELSŐ SÁV
+            colors.screenBackground,
         // ====================================================
 
         topBar = {
@@ -398,7 +415,7 @@ fun MatchListScreen(
             NavigationBar(
 
                 containerColor =
-                    Color.White,
+                    colors.cardBackground,
 
                 tonalElevation =
                     8.dp
@@ -555,7 +572,7 @@ fun MatchListScreen(
                     if (searchQuery.isNotEmpty()) {
                         Text(
                             text = "✕",
-                            color = Color(0xFF94A3B8),
+                            color = colors.tertiaryText,
                             modifier =
                                 Modifier.clickable {
                                     searchQuery = ""
@@ -588,7 +605,7 @@ fun MatchListScreen(
                     RoundedCornerShape(12.dp),
 
                 color =
-                    Color.White,
+                    colors.cardBackground,
 
                 shadowElevation =
                     1.dp
@@ -654,7 +671,7 @@ fun MatchListScreen(
                                 13.sp,
 
                             color =
-                                Color(0xFF172033)
+                                colors.primaryText
                         )
                     }
 
@@ -708,7 +725,7 @@ fun MatchListScreen(
                         Surface(
 
                             color =
-                                Color(0xFFEFF6FF),
+                                colors.chipBackground,
 
                             shape =
                                 RoundedCornerShape(8.dp)
@@ -791,7 +808,7 @@ fun MatchListScreen(
                                     "Mérkőzések betöltése…",
 
                                 color =
-                                    Color(0xFF64748B),
+                                    colors.secondaryText,
 
                                 fontSize =
                                     13.sp
@@ -848,7 +865,7 @@ fun MatchListScreen(
                                     TextAlign.Center,
 
                                 color =
-                                    Color(0xFF64748B),
+                                    colors.secondaryText,
 
                                 fontSize =
                                     12.sp
@@ -924,7 +941,7 @@ fun MatchListScreen(
                                     FontWeight.Bold,
 
                                 color =
-                                    Color(0xFF334155)
+                                    colors.primaryText
                             )
 
                             Spacer(
@@ -938,7 +955,7 @@ fun MatchListScreen(
                                     "Válassz másik napot a naptárban.",
 
                                 color =
-                                    Color(0xFF94A3B8),
+                                    colors.tertiaryText,
 
                                 fontSize =
                                     12.sp
@@ -986,7 +1003,7 @@ fun MatchListScreen(
                                         TextAlign.Center,
 
                                     color =
-                                        Color(0xFF334155)
+                                        colors.primaryText
                                 )
                             }
 
@@ -1030,7 +1047,7 @@ fun MatchListScreen(
                                                 },
 
                                         color =
-                                            if (featured) Color(0xFFEFF6FF) else Color.White
+                                            if (featured) colors.chipBackground else colors.cardBackground
                                     ) {
 
                                         Column {
@@ -1066,14 +1083,14 @@ fun MatchListScreen(
                                                         text = first.leagueCountry,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 11.sp,
-                                                        color = Color(0xFF64748B)
+                                                        color = colors.secondaryText
                                                     )
 
                                                     Text(
                                                         text = first.leagueName,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 13.sp,
-                                                        color = Color(0xFF0F172A)
+                                                        color = colors.primaryText
                                                     )
                                                 }
 
@@ -1082,7 +1099,7 @@ fun MatchListScreen(
                                                         if (featured) "★" else "☆",
 
                                                     color =
-                                                        if (featured) Color(0xFFF59E0B) else Color(0xFF94A3B8),
+                                                        if (featured) Color(0xFFF59E0B) else colors.tertiaryText,
 
                                                     fontSize = 17.sp,
 
@@ -1102,7 +1119,7 @@ fun MatchListScreen(
 
                                                 Surface(
                                                     shape = RoundedCornerShape(8.dp),
-                                                    color = Color(0xFFEFF6FF)
+                                                    color = colors.chipBackground
                                                 ) {
 
                                                     Text(
@@ -1123,7 +1140,7 @@ fun MatchListScreen(
                                                 modifier =
                                                     Modifier.padding(horizontal = 10.dp),
                                                 thickness = 0.5.dp,
-                                                color = Color(0xFFE2E8F0)
+                                                color = colors.divider
                                             )
                                         }
                                     }
@@ -1182,7 +1199,7 @@ fun MatchListScreen(
                                 text = title,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
-                                color = Color(0xFF334155)
+                                color = colors.primaryText
                             )
 
                             Spacer(Modifier.height(5.dp))
@@ -1190,7 +1207,7 @@ fun MatchListScreen(
                             Text(
                                 text = subtitle,
                                 textAlign = TextAlign.Center,
-                                color = Color(0xFF94A3B8),
+                                color = colors.tertiaryText,
                                 fontSize = 12.sp
                             )
                         }
@@ -1295,7 +1312,10 @@ fun MatchListScreen(
                                                 onMatchClick,
 
                                             onToggleFavorite =
-                                                onToggleFavorite
+                                                onToggleFavorite,
+
+                                            onToggleFollowTeam =
+                                                onToggleFollowTeam
                                         )
                                     }
                                 }
@@ -1321,13 +1341,15 @@ private fun DateSelector(
         (Int) -> Unit
 ) {
 
+    val colors = LocalAppColors.current
+
     LazyRow(
 
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(
-                    Color(0xFFF5F7FB)
+                    colors.screenBackground
                 )
                 .padding(
                     vertical = 8.dp
@@ -1425,7 +1447,7 @@ private fun DateSelector(
                     ) {
                         Color(0xFF2563EB)
                     } else {
-                        Color.White
+                        colors.cardBackground
                     },
 
                 shadowElevation =
@@ -1464,7 +1486,7 @@ private fun DateSelector(
                             ) {
                                 Color.White
                             } else {
-                                Color(0xFF64748B)
+                                colors.secondaryText
                             }
                     )
 
@@ -1485,7 +1507,7 @@ private fun DateSelector(
                             ) {
                                 Color.White
                             } else {
-                                Color(0xFF172033)
+                                colors.primaryText
                             }
                     )
 
@@ -1516,7 +1538,7 @@ private fun DateSelector(
                             ) {
                                 Color(0xFFDCEBFF)
                             } else {
-                                Color(0xFF94A3B8)
+                                colors.tertiaryText
                             }
                     )
                 }
@@ -1567,6 +1589,8 @@ private fun DateArrow(
     onClick: () -> Unit
 ) {
 
+    val colors = LocalAppColors.current
+
     Surface(
 
         modifier =
@@ -1588,9 +1612,9 @@ private fun DateArrow(
 
         color =
             if (enabled) {
-                Color.White
+                colors.cardBackground
             } else {
-                Color(0xFFE2E8F0)
+                colors.statusChipBackground
             }
     ) {
 
@@ -1619,7 +1643,7 @@ private fun DateArrow(
                     if (enabled) {
                         Color(0xFF2563EB)
                     } else {
-                        Color(0xFF94A3B8)
+                        colors.tertiaryText
                     }
             )
         }
