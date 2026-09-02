@@ -12,6 +12,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Query
+import retrofit2.http.Url
+import com.google.gson.JsonObject
 import java.lang.reflect.Type
 
 // ============================================================
@@ -26,7 +28,13 @@ data class StatpalTeamInfo(
     val name: String?,
 
     @SerializedName("goals")
-    val goals: String?
+    val goals: String?,
+
+    @SerializedName(
+        value = "logo",
+        alternate = ["logo_url", "image", "crest", "badge", "team_logo"]
+    )
+    val logoUrl: String? = null
 )
 
 data class StatpalMatchItem(
@@ -297,6 +305,25 @@ interface StatpalApiService {
 }
 
 // ============================================================
+// STATPAL MÉRKŐZÉS RÉSZLETEK
+//
+// A StatPal külön végpontokat biztosít az élő statisztikákhoz,
+// play-by-play eseményekhez és keretekhez. A részletes JSON-t itt
+// JsonObjectként vesszük át, mert a szolgáltató többféle mezőalakot
+// használhat ligától / adatkörtől függően. A UI-réteg egy közös,
+// stabil modellt kap.
+// ============================================================
+
+interface StatpalMatchDetailsApiService {
+
+    @GET
+    suspend fun getDetails(
+        @Url url: String,
+        @Query("access_key") accessKey: String
+    ): JsonObject
+}
+
+// ============================================================
 // HIGHLIGHTLY DTO
 // ============================================================
 
@@ -384,6 +411,18 @@ object NetworkModule {
             )
             .build()
             .create(StatpalApiService::class.java)
+    }
+
+    val statpalMatchDetailsApi: StatpalMatchDetailsApiService by lazy {
+
+        Retrofit.Builder()
+            .baseUrl(STATPAL_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(
+                GsonConverterFactory.create()
+            )
+            .build()
+            .create(StatpalMatchDetailsApiService::class.java)
     }
 
     val highlightlyApi: HighlightlyApiService by lazy {
