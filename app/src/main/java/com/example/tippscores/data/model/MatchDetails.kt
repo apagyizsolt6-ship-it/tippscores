@@ -1,0 +1,46 @@
+package com.example.tippscores.data.model
+
+data class MatchDetails(
+    val statistics: List<MatchStatistic> = emptyList(),
+    val events: List<MatchEvent> = emptyList(),
+    val homeLineup: MatchLineup = MatchLineup(),
+    val awayLineup: MatchLineup = MatchLineup()
+) {
+    val hasStatistics: Boolean get() = statistics.isNotEmpty()
+    val hasEvents: Boolean get() = events.isNotEmpty()
+    val hasLineups: Boolean get() =
+        homeLineup.startingPlayers.isNotEmpty() ||
+            homeLineup.substitutePlayers.isNotEmpty() ||
+            awayLineup.startingPlayers.isNotEmpty() ||
+            awayLineup.substitutePlayers.isNotEmpty()
+}
+
+data class MatchStatistic(
+    val label: String,
+    val home: String,
+    val away: String
+)
+
+data class MatchEvent(
+    val minute: String,
+    val team: String,
+    val player: String,
+    val assist: String? = null,
+    val type: String,
+    val detail: String? = null
+)
+
+data class MatchLineup(
+    val formation: String? = null,
+    val coach: String? = null,
+    val startingPlayers: List<LineupPlayer> = emptyList(),
+    val substitutePlayers: List<LineupPlayer> = emptyList()
+)
+
+data class LineupPlayer(
+    val number: String? = null,
+    val name: String,
+    val position: String? = null,
+    val photoUrl: String? = null,
+    val isCaptain: Boolean = false
+)
