@@ -436,6 +436,19 @@ interface HighlightlyApiService {
     ): JsonElement
 
     // --------------------------------------------------------
+    // ÉLŐ ESEMÉNYEK
+    // --------------------------------------------------------
+
+    @GET("events/{id}")
+    suspend fun getMatchEvents(
+        @Header("x-rapidapi-key")
+        apiKey: String,
+
+        @retrofit2.http.Path("id")
+        matchId: String
+    ): JsonElement
+
+    // --------------------------------------------------------
     // Videó/highlight lista
     // --------------------------------------------------------
 
