@@ -49,6 +49,7 @@ import com.example.tippscores.data.model.LineupPlayer
 import com.example.tippscores.data.model.Match
 import com.example.tippscores.data.model.MatchDetails
 import com.example.tippscores.data.model.MatchEvent
+import com.example.tippscores.data.model.HeadToHeadMatch
 import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.ui.theme.LocalAppColors
 
@@ -210,7 +211,7 @@ fun MatchDetailScreen(
                     containerColor = colors.cardBackground,
                     contentColor = Color(0xFF2563EB)
                 ) {
-                    listOf("Statisztika", "Események", "Összeállítás").forEachIndexed { index, title ->
+                    listOf("Statisztika", "Események", "Összeállítás", "H2H").forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
@@ -323,6 +324,16 @@ fun MatchDetailScreen(
                                     "A kezdő 11 és a cserepad ehhez a mérkőzéshez jelenleg nem érhető el."
                                 )
                             }
+                        }
+                    }
+
+                    3 -> {
+                        item {
+                            HeadToHeadSection(
+                                matches = details?.headToHead.orEmpty(),
+                                homeTeam = match.homeTeam,
+                                awayTeam = match.awayTeam
+                            )
                         }
                     }
                 }
@@ -746,6 +757,89 @@ private fun PlayerRow(player: LineupPlayer) {
         }
     }
 }
+
+@Composable
+private fun HeadToHeadSection(
+    matches: List<HeadToHeadMatch>,
+    homeTeam: String,
+    awayTeam: String
+) {
+    val colors = LocalAppColors.current
+
+    if (matches.isEmpty()) {
+        EmptyDetailsCard("Az utolsó 10 egymás elleni mérkőzés jelenleg nem érhető el.")
+        return
+    }
+
+    val homeWins = matches.count {
+        it.homeTeam.equals(homeTeam, true) && (it.homeScore.toIntOrNull() ?: -1) > (it.awayScore.toIntOrNull() ?: -1) ||
+            it.awayTeam.equals(homeTeam, true) && (it.awayScore.toIntOrNull() ?: -1) > (it.homeScore.toIntOrNull() ?: -1)
+    }
+    val awayWins = matches.count {
+        it.homeTeam.equals(awayTeam, true) && (it.homeScore.toIntOrNull() ?: -1) > (it.awayScore.toIntOrNull() ?: -1) ||
+            it.awayTeam.equals(awayTeam, true) && (it.awayScore.toIntOrNull() ?: -1) > (it.homeScore.toIntOrNull() ?: -1)
+    }
+    val draws = matches.count {
+        val h = it.homeScore.toIntOrNull()
+        val a = it.awayScore.toIntOrNull()
+        h != null && a != null && h == a
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = colors.cardBackground
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("Egymás elleni mérleg", color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    H2HSummary(homeTeam, homeWins, colors.primaryText)
+                    H2HSummary("Döntetlen", draws, colors.secondaryText)
+                    H2HSummary(awayTeam, awayWins, colors.primaryText)
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = colors.cardBackground
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Utolsó 10 egymás elleni", color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                Spacer(Modifier.height(8.dp))
+                matches.forEach { match ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(formatH2HDate(match.date), color = colors.tertiaryText, fontSize = 9.sp, modifier = Modifier.width(72.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(match.homeTeam, color = colors.primaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text(match.awayTeam, color = colors.secondaryText, fontSize = 11.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("${match.homeScore} – ${match.awayScore}", color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun H2HSummary(label: String, value: Int, textColor: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(90.dp)) {
+        Text(value.toString(), color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+        Text(label, color = LocalAppColors.current.tertiaryText, fontSize = 9.sp, textAlign = TextAlign.Center)
+    }
+}
+
+private fun formatH2HDate(value: String): String =
+    value.take(10).ifBlank { "–" }
 
 @Composable
 private fun EmptyDetailsCard(text: String) {
