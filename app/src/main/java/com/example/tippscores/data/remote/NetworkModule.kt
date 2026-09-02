@@ -507,6 +507,17 @@ interface HighlightlyApiService {
     ): JsonElement
 
     // --------------------------------------------------------
+    // EGYEZŐ CSAPATOK - H2H
+    // --------------------------------------------------------
+
+    @GET("head-2-head")
+    suspend fun getHeadToHead(
+        @Header("x-rapidapi-key") apiKey: String,
+        @Query("teamIdOne") teamIdOne: String,
+        @Query("teamIdTwo") teamIdTwo: String
+    ): JsonElement
+
+    // --------------------------------------------------------
     // TELJES NAPI MÉRKŐZÉSLISTA
     //
     // Innen kapjuk:
