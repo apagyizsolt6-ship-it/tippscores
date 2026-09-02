@@ -29,6 +29,7 @@ import com.example.tippscores.data.repository.TeamProfileRepository
 import com.example.tippscores.notifications.GoalCheckWorker
 import com.example.tippscores.ui.screens.MatchDetailScreen
 import com.example.tippscores.ui.screens.MatchListScreen
+import com.example.tippscores.ui.screens.TeamProfileScreen
 import com.example.tippscores.ui.theme.TippScoresTheme
 import com.example.tippscores.ui.viewmodel.MatchViewModel
 import java.util.concurrent.TimeUnit
