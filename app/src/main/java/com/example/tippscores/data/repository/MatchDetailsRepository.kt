@@ -318,7 +318,9 @@ private object MatchDetailsParser {
                     visit(child)
                 }
             } else if (element.isJsonArray) {
-                element.forEach(::visit)
+                for (child in element.asJsonArray) {
+                    visit(child)
+                }
             }
         }
         visit(root)
@@ -336,7 +338,9 @@ private object MatchDetailsParser {
                     visit(child)
                 }
             } else if (element.isJsonArray) {
-                element.forEach(::visit)
+                for (child in element.asJsonArray) {
+                    visit(child)
+                }
             }
         }
         visit(root)
