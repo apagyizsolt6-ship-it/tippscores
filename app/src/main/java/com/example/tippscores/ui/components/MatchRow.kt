@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,13 +36,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.tippscores.data.model.Match
+import com.example.tippscores.ui.theme.LocalAppColors
 
 @Composable
 fun MatchRow(
     match: Match,
     onMatchClick: (String) -> Unit,
-    onToggleFavorite: (String) -> Unit
+    onToggleFavorite: (String) -> Unit,
+    onToggleFollowTeam: (String) -> Unit
 ) {
+
+    val colors = LocalAppColors.current
 
     val status =
         translateStatus(
@@ -64,7 +67,7 @@ fun MatchRow(
                 Color(0xFFEA580C)
 
             else ->
-                Color(0xFF64748B)
+                colors.secondaryText
         }
 
     Surface(
@@ -79,9 +82,9 @@ fun MatchRow(
 
         color =
             if (match.isLive)
-                Color(0xFFFFF7F7)
+                colors.cardBackgroundLive
             else
-                Color.White
+                colors.cardBackground
     ) {
 
         Column {
@@ -137,7 +140,7 @@ fun MatchRow(
                                 if (match.isFavorite)
                                     Color(0xFFF59E0B)
                                 else
-                                    Color(0xFF94A3B8),
+                                    colors.tertiaryText,
 
                             modifier =
                                 Modifier.size(18.dp)
@@ -157,7 +160,7 @@ fun MatchRow(
                             if (match.isLive)
                                 Color(0xFFFFE4E6)
                             else
-                                Color(0xFFF1F5F9)
+                                colors.statusChipBackground
                     ) {
 
                         Text(
@@ -205,7 +208,17 @@ fun MatchRow(
                             match.homeTeamLogo,
 
                         justScored =
-                            match.homeJustScored
+                            match.homeJustScored,
+
+                        isFollowed =
+                            match.isHomeTeamFollowed,
+
+                        textColor =
+                            colors.primaryText,
+
+                        onToggleFollow = {
+                            onToggleFollowTeam(match.homeTeam)
+                        }
                     )
 
                     Spacer(
@@ -221,7 +234,17 @@ fun MatchRow(
                             match.awayTeamLogo,
 
                         justScored =
-                            match.awayJustScored
+                            match.awayJustScored,
+
+                        isFollowed =
+                            match.isAwayTeamFollowed,
+
+                        textColor =
+                            colors.primaryText,
+
+                        onToggleFollow = {
+                            onToggleFollowTeam(match.awayTeam)
+                        }
                     )
                 }
 
@@ -252,7 +275,7 @@ fun MatchRow(
                             if (match.isLive)
                                 Color(0xFFDC2626)
                             else
-                                Color(0xFF111827),
+                                colors.primaryText,
 
                         fontSize = 14.sp,
 
@@ -275,7 +298,7 @@ fun MatchRow(
                             if (match.isLive)
                                 Color(0xFFDC2626)
                             else
-                                Color(0xFF111827),
+                                colors.primaryText,
 
                         fontSize = 14.sp,
 
@@ -371,7 +394,7 @@ fun MatchRow(
                 thickness = 0.5.dp,
 
                 color =
-                    Color(0xFFE2E8F0)
+                    colors.divider
             )
         }
     }
@@ -381,12 +404,18 @@ fun MatchRow(
 private fun TeamItem(
     name: String,
     logoUrl: String,
-    justScored: Boolean = false
+    textColor: Color,
+    justScored: Boolean = false,
+    isFollowed: Boolean = false,
+    onToggleFollow: () -> Unit = {}
 ) {
 
     Row(
         verticalAlignment =
-            Alignment.CenterVertically
+            Alignment.CenterVertically,
+
+        modifier =
+            Modifier.clickable(onClick = onToggleFollow)
     ) {
 
         if (logoUrl.isNotBlank()) {
@@ -426,11 +455,20 @@ private fun TeamItem(
                 Modifier.width(8.dp)
         )
 
+        if (isFollowed) {
+
+            Text(
+                text = "● ",
+                color = Color(0xFF2563EB),
+                fontSize = 10.sp
+            )
+        }
+
         Text(
             text = name,
 
             color =
-                Color(0xFF1E293B),
+                if (isFollowed) Color(0xFF2563EB) else textColor,
 
             fontSize = 13.sp,
 

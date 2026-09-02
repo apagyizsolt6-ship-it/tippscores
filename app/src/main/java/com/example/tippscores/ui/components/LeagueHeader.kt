@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tippscores.ui.theme.LocalAppColors
 
 @Composable
 fun LeagueHeader(
@@ -27,6 +28,11 @@ fun LeagueHeader(
     onToggleFeatured: () -> Unit = {}
 ) {
 
+    val colors = LocalAppColors.current
+
+    // Világos módban országonként eltérő pasztell háttér, sötét
+    // módban egyetlen egységes sötét kártyaszín - így nem kell 5
+    // külön sötét pasztell változatot is karbantartani.
     val fallbackColor =
         when (
             country.uppercase()
@@ -49,6 +55,12 @@ fun LeagueHeader(
 
             else ->
                 Color(0xFFFFFBEB)
+        }.let { light ->
+            if (colors.isDark) {
+                colors.headerFallback
+            } else {
+                light
+            }
         }
 
     // "Üveghatás": áttetsző kék színátmenet, sötétebb kékkel a
@@ -69,10 +81,10 @@ fun LeagueHeader(
         }
 
     val textColor =
-        if (isFeatured) Color.White else Color(0xFF0F172A)
+        if (isFeatured) Color.White else colors.primaryText
 
     val countryTextColor =
-        if (isFeatured) Color(0xFFDCEBFF) else Color(0xFF64748B)
+        if (isFeatured) Color(0xFFDCEBFF) else colors.secondaryText
 
     Row(
         modifier =
@@ -117,7 +129,7 @@ fun LeagueHeader(
                 "  •  ",
 
             color =
-                if (isFeatured) Color(0xFFBFDBFE) else Color(0xFFCBD5E1),
+                if (isFeatured) Color(0xFFBFDBFE) else colors.tertiaryText,
 
             fontSize = 10.sp
         )
@@ -145,7 +157,7 @@ fun LeagueHeader(
                 if (isFeatured) "★" else "☆",
 
             color =
-                if (isFeatured) Color(0xFFFBBF24) else Color(0xFF94A3B8),
+                if (isFeatured) Color(0xFFFBBF24) else colors.tertiaryText,
 
             fontSize = 15.sp,
 
@@ -163,7 +175,7 @@ fun LeagueHeader(
                 if (isCollapsed) "▸" else "▾",
 
             color =
-                if (isFeatured) Color(0xFFDCEBFF) else Color(0xFF94A3B8),
+                if (isFeatured) Color(0xFFDCEBFF) else colors.tertiaryText,
 
             fontSize = 12.sp,
 
