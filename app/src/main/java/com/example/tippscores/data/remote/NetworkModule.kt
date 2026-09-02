@@ -318,8 +318,20 @@ data class HighlightlyItemDto(
     @SerializedName("id")
     val id: String?,
 
+    @SerializedName("type")
+    val type: String? = null,
+
     @SerializedName("title")
     val title: String?,
+
+    @SerializedName("description")
+    val description: String? = null,
+
+    @SerializedName("imgUrl")
+    val imgUrl: String? = null,
+
+    @SerializedName("embedUrl")
+    val embedUrl: String? = null,
 
     @SerializedName("url")
     val url: String?,
