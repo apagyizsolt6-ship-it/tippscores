@@ -33,8 +33,12 @@ data class Match(
     val hasVideoHighlight: Boolean = false,
     val videoUrl: String? = null,
 
-    // Csak a UI rétegben számolt mező (kedvencek, SharedPreferences alapján) -
-    // nem kerül be a Room adatbázisba, mert a "matches" tábla minden
-    // frissítéskor törlődik és újraépül.
-    val isFavorite: Boolean = false
+    // Csak a UI rétegben számolt mezők (SharedPreferences alapján).
+    // Nem kerülnek be a Room adatbázisba.
+    val isFavorite: Boolean = false,
+
+    // Követett hazai és vendég csapat állapota.
+    // Szintén csak a UI rétegben számolt mezők.
+    val isHomeTeamFollowed: Boolean = false,
+    val isAwayTeamFollowed: Boolean = false
 )
