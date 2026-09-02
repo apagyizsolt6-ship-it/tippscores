@@ -449,6 +449,18 @@ interface HighlightlyApiService {
     ): JsonElement
 
     // --------------------------------------------------------
+    // JÁTÉKOS ADATOK / BOX SCORE
+    // --------------------------------------------------------
+
+    @GET("box-score/{matchId}")
+    suspend fun getBoxScore(
+        @Header("x-rapidapi-key")
+        apiKey: String,
+        @retrofit2.http.Path("matchId")
+        matchId: String
+    ): JsonElement
+
+    // --------------------------------------------------------
     // Videó/highlight lista
     // --------------------------------------------------------
 
