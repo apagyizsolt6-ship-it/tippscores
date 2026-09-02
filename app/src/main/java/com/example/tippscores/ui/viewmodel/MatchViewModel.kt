@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.model.Match
+import com.example.tippscores.data.model.MatchDetails
 import com.example.tippscores.data.repository.MatchRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,7 +15,8 @@ import kotlinx.coroutines.launch
 
 class MatchViewModel(
     private val repository: MatchRepository,
-    private val apiPreferences: ApiPreferences
+    private val apiPreferences: ApiPreferences,
+    private val detailsRepository: com.example.tippscores.data.repository.MatchDetailsRepository
 ) : ViewModel() {
 
     // ========================================================
@@ -171,6 +173,70 @@ class MatchViewModel(
     val selectedOffset: StateFlow<Int> =
         _selectedOffset
 
+
+
+    // ========================================================
+    // MÉRKŐZÉS RÉSZLETEK
+    // ========================================================
+
+    private val _matchDetails =
+        MutableStateFlow<MatchDetails?>(null)
+
+    val matchDetails: StateFlow<MatchDetails?> =
+        _matchDetails
+
+    private val _detailsLoading =
+        MutableStateFlow(false)
+
+    val detailsLoading: StateFlow<Boolean> =
+        _detailsLoading
+
+    private val _detailsError =
+        MutableStateFlow<String?>(null)
+
+    val detailsError: StateFlow<String?> =
+        _detailsError
+
+    private var openedMatchId: String? = null
+
+    fun openMatchDetails(match: Match) {
+        if (openedMatchId == match.id && _matchDetails.value != null) return
+
+        openedMatchId = match.id
+        _matchDetails.value = null
+        _detailsError.value = null
+
+        viewModelScope.launch {
+            _detailsLoading.value = true
+            try {
+                _matchDetails.value = detailsRepository.fetch(
+                    matchId = match.id,
+                    homeTeam = match.homeTeam,
+                    awayTeam = match.awayTeam
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _detailsError.value =
+                    e.localizedMessage ?: "A mérkőzés részletes adatai nem tölthetők be."
+            } finally {
+                _detailsLoading.value = false
+            }
+        }
+    }
+
+    fun retryMatchDetails() {
+        val id = openedMatchId ?: return
+        val match = matches.value.find { it.id == id } ?: return
+        openedMatchId = null
+        openMatchDetails(match)
+    }
+
+    fun clearMatchDetails() {
+        openedMatchId = null
+        _matchDetails.value = null
+        _detailsError.value = null
+        _detailsLoading.value = false
+    }
     // ========================================================
     // INIT
     // ========================================================
