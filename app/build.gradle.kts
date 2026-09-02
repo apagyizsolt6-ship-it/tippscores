@@ -33,6 +33,9 @@ android {
 }
 
 dependencies {
+    // WorkManager (háttérben futó gólellenőrzés push értesítéshez)
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
+
     // Compose & Core
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
