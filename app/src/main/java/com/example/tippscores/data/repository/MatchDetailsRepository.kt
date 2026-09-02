@@ -52,9 +52,13 @@ class MatchDetailsRepository(
                 h?.statistics?.let { parseHighlightlyStatisticsElement(it) }.orEmpty()
             }
 
-        val highlightlyEvents = h?.details?.let {
-            parseEvents(it, homeTeam, awayTeam)
-        }.orEmpty()
+        val highlightlyEvents = h?.events?.let {
+            parseHighlightlyEvents(it, homeTeam, awayTeam)
+        }.orEmpty().ifEmpty {
+            h?.details?.let {
+                parseEvents(it, homeTeam, awayTeam)
+            }.orEmpty()
+        }
 
         val highlightlyLineups = h?.details?.let {
             Pair(
@@ -104,7 +108,8 @@ class MatchDetailsRepository(
     private data class HighlightlyMatchDetails(
         val id: String,
         val details: JsonObject?,
-        val statistics: JsonElement?
+        val statistics: JsonElement?,
+        val events: JsonElement?
     )
 
     private suspend fun fetchHighlightlyMatch(
@@ -128,26 +133,37 @@ class MatchDetailsRepository(
             } ?: response.data.orEmpty().firstOrNull()
 
             val id = candidate?.id ?: return null
-            val element = NetworkModule.highlightlyApi.getMatchById(key, id)
+
+            val element = try {
+                NetworkModule.highlightlyApi.getMatchById(key, id)
+            } catch (_: Exception) {
+                null
+            }
+
             val details = when {
-                element.isJsonArray -> element.asJsonArray.firstOrNull()?.asJsonObject
-                element.isJsonObject -> element.asJsonObject
+                element?.isJsonArray == true ->
+                    element.asJsonArray.firstOrNull()?.takeIf { it.isJsonObject }?.asJsonObject
+                element?.isJsonObject == true -> element.asJsonObject
                 else -> null
             }
 
-            var statistics: JsonElement? = details?.get("statistics")
-            if (statistics == null || statistics.isJsonNull) {
-                statistics = try {
-                    NetworkModule.highlightlyApi.getMatchStatistics(key, id)
-                } catch (_: Exception) {
-                    null
-                }
+            val statistics = try {
+                NetworkModule.highlightlyApi.getMatchStatistics(key, id)
+            } catch (_: Exception) {
+                details?.get("statistics")
+            }
+
+            val events = try {
+                NetworkModule.highlightlyApi.getMatchEvents(key, id)
+            } catch (_: Exception) {
+                details?.get("events")
             }
 
             HighlightlyMatchDetails(
                 id = id,
                 details = details,
-                statistics = statistics
+                statistics = statistics,
+                events = events
             )
         } catch (_: HttpException) {
             null
@@ -213,6 +229,47 @@ class MatchDetailsRepository(
                 away = away?.values?.get(raw) ?: "–"
             )
         }
+    }
+
+    private fun parseHighlightlyEvents(
+        element: JsonElement,
+        homeTeam: String,
+        awayTeam: String
+    ): List<MatchEvent> {
+        val array = when {
+            element.isJsonArray -> element.asJsonArray
+            element.isJsonObject -> {
+                element.asJsonObject.getAsJsonArray("data")
+                    ?: element.asJsonObject.getAsJsonArray("events")
+                    ?: JsonArray()
+            }
+            else -> JsonArray()
+        }
+
+        return array.mapNotNull { item ->
+            if (!item.isJsonObject) return@mapNotNull null
+            val obj = item.asJsonObject
+
+            val teamObject = obj.getAsJsonObject("team")
+            val team = teamObject?.let { firstString(it, "name") }
+                ?: firstString(obj, "teamName", "team_name", "team", "side")
+                ?: inferTeam(obj, homeTeam, awayTeam)
+
+            val rawType = firstString(obj, "type", "eventType", "kind") ?: "Esemény"
+            val rawMinute = firstString(obj, "time", "minute", "elapsed", "clock") ?: "–"
+            val player = firstString(obj, "player", "playerName", "player_name", "name")
+                ?: "Ismeretlen játékos"
+            val assist = firstString(obj, "assist", "assistingPlayer", "assistName", "assist_name")
+
+            MatchEvent(
+                minute = normalizeMinute(rawMinute),
+                team = team,
+                player = player,
+                assist = assist,
+                type = translateEventType(rawType),
+                detail = firstString(obj, "detail", "description", "comments")
+            )
+        }.sortedBy { minuteSortKey(it.minute) }
     }
 
     private fun parseEvents(
@@ -406,11 +463,17 @@ class MatchDetailsRepository(
 
     private fun translateEventType(raw: String): String = when (normalize(raw)) {
         "goal", "goals", "score" -> "Gól"
-        "own goal", "owngoal" -> "Öngól"
-        "yellow card", "yellowcard", "yellow" -> "Sárga lap"
-        "red card", "redcard", "red" -> "Piros lap"
+        "owngoal" -> "Öngól"
+        "yellowcard", "yellow" -> "Sárga lap"
+        "redcard", "red" -> "Piros lap"
         "substitution", "substitute", "sub" -> "Csere"
         "penalty" -> "Tizenegyes"
+        "missedpenalty" -> "Kihagyott tizenegyes"
+        "vargoalconfirmed" -> "VAR – gól megerősítve"
+        "vargoalcancelled" -> "VAR – gól törölve"
+        "varpenalty" -> "VAR – tizenegyes"
+        "varpenaltycancelled" -> "VAR – tizenegyes törölve"
+        "vargoalcancelledoffside" -> "VAR – gól törölve (les)"
         else -> raw
     }
 }
