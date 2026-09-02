@@ -474,6 +474,39 @@ interface HighlightlyApiService {
     ): HighlightlyResponseDto
 
     // --------------------------------------------------------
+    // CSAPATKERESÉS / CSAPATPROFIL
+    // --------------------------------------------------------
+
+    @GET("teams")
+    suspend fun searchTeams(
+        @Header("x-rapidapi-key") apiKey: String,
+        @Query("name") name: String,
+        @Query("type") type: String = "club",
+        @Query("limit") limit: Int = 10,
+        @Query("offset") offset: Int = 0
+    ): JsonElement
+
+    @GET("teams/{id}")
+    suspend fun getTeamById(
+        @Header("x-rapidapi-key") apiKey: String,
+        @retrofit2.http.Path("id") teamId: String
+    ): JsonElement
+
+    @GET("teams/statistics/{id}")
+    suspend fun getTeamStatistics(
+        @Header("x-rapidapi-key") apiKey: String,
+        @retrofit2.http.Path("id") teamId: String,
+        @Query("fromDate") fromDate: String,
+        @Query("timezone") timezone: String = "Europe/Budapest"
+    ): JsonElement
+
+    @GET("last-five-games")
+    suspend fun getLastFiveGames(
+        @Header("x-rapidapi-key") apiKey: String,
+        @Query("teamId") teamId: String
+    ): JsonElement
+
+    // --------------------------------------------------------
     // TELJES NAPI MÉRKŐZÉSLISTA
     //
     // Innen kapjuk:
