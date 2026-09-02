@@ -388,6 +388,54 @@ data class HighlightlyMatchesResponseDto(
 interface HighlightlyApiService {
 
     // --------------------------------------------------------
+    // MÉRKŐZÉS KERESÉSE CSAPATOK ALAPJÁN
+    // --------------------------------------------------------
+
+    @GET("matches")
+    suspend fun findMatches(
+        @Header("x-rapidapi-key")
+        apiKey: String,
+
+        @Query("homeTeamName")
+        homeTeamName: String,
+
+        @Query("awayTeamName")
+        awayTeamName: String,
+
+        @Query("limit")
+        limit: Int = 10,
+
+        @Query("offset")
+        offset: Int = 0
+    ): HighlightlyMatchesResponseDto
+
+    // --------------------------------------------------------
+    // MÉRKŐZÉS RÉSZLETES ADATAI
+    // --------------------------------------------------------
+
+    @GET("matches/{id}")
+    suspend fun getMatchById(
+        @Header("x-rapidapi-key")
+        apiKey: String,
+
+        @retrofit2.http.Path("id")
+        matchId: String
+    ): JsonElement
+
+    // --------------------------------------------------------
+    // MÉRKŐZÉS STATISZTIKÁK
+    // --------------------------------------------------------
+
+    @GET("statistics/{matchId}")
+    suspend fun getMatchStatistics(
+        @Header("x-rapidapi-key")
+        apiKey: String,
+
+        @retrofit2.http.Path("matchId")
+        matchId: String
+    ): JsonElement
+
+    // --------------------------------------------------------
     // Videó/highlight lista
     // --------------------------------------------------------
 
