@@ -1,5 +1,7 @@
 package com.example.tippscores.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -211,7 +213,7 @@ fun MatchDetailScreen(
                     containerColor = colors.cardBackground,
                     contentColor = Color(0xFF2563EB)
                 ) {
-                    listOf("Statisztika", "Események", "Összeállítás", "H2H").forEachIndexed { index, title ->
+                    listOf("Statisztika", "Események", "Összeállítás", "H2H", "Highlight").forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
@@ -334,6 +336,12 @@ fun MatchDetailScreen(
                                 homeTeam = match.homeTeam,
                                 awayTeam = match.awayTeam
                             )
+                        }
+                    }
+
+                    4 -> {
+                        item {
+                            HighlightSection(details?.highlight)
                         }
                     }
                 }
@@ -754,6 +762,86 @@ private fun PlayerRow(player: LineupPlayer) {
 
         player.position?.takeIf { it.isNotBlank() }?.let {
             Text(it, color = colors.tertiaryText, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+private fun HighlightSection(highlight: com.example.tippscores.data.model.MatchHighlight?) {
+    val colors = LocalAppColors.current
+
+    if (highlight == null) {
+        EmptyDetailsCard("Ehhez a mérkőzéshez jelenleg nincs elérhető videós összefoglaló.")
+        return
+    }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val targetUrl = highlight.embedUrl?.takeIf { it.isNotBlank() }
+        ?: highlight.url?.takeIf { it.isNotBlank() }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = targetUrl != null) {
+                targetUrl?.let {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                    )
+                }
+            },
+        shape = RoundedCornerShape(16.dp),
+        color = colors.cardBackground
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            if (!highlight.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = highlight.imageUrl,
+                    contentDescription = "Mérkőzés highlight",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(190.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.height(10.dp))
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = colors.statusChipBackground
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("▶️", fontSize = 42.sp)
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+
+            Text(
+                highlight.title.ifBlank { "Mérkőzés összefoglaló" },
+                color = colors.primaryText,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 15.sp
+            )
+
+            highlight.description?.takeIf { it.isNotBlank() }?.let { description ->
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    description,
+                    color = colors.secondaryText,
+                    fontSize = 11.sp
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Text(
+                if (targetUrl != null) "▶  Highlight megnyitása" else "A videó jelenleg nem nyitható meg",
+                color = Color(0xFF2563EB),
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
         }
     }
 }
