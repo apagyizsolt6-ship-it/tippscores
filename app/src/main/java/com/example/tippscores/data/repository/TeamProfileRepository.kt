@@ -25,7 +25,7 @@ class TeamProfileRepository(
             )
 
             val candidates = asArray(search)
-            val team = candidates.firstOrNull { sameTeam(string(it, "name"), teamName) }
+            val team = candidates.firstOrNull { sameTeam(firstString(it, "name"), teamName) }
                 ?: candidates.firstOrNull()
                 ?: return null
 
@@ -219,9 +219,9 @@ class TeamProfileRepository(
 
     private fun normalize(value: String): String = value
         .lowercase()
-        .replace("谩", "a").replace("茅", "e").replace("铆", "i")
-        .replace("贸", "o").replace("枚", "o").replace("艖", "o")
-        .replace("煤", "u").replace("眉", "u").replace("疟", "u")
+        .replace("á", "a").replace("é", "e").replace("í", "i")
+        .replace("ó", "o").replace("ö", "o").replace("ő", "o")
+        .replace("ú", "u").replace("ü", "u").replace("ű", "u")
         .replace("-", "").replace("_", "").replace(" ", "")
 
     private fun prettyLabel(value: String): String = value
