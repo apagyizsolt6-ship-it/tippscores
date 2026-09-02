@@ -5,6 +5,7 @@ import com.example.tippscores.data.model.LineupPlayer
 import com.example.tippscores.data.model.MatchDetails
 import com.example.tippscores.data.model.MatchEvent
 import com.example.tippscores.data.model.MatchLineup
+import com.example.tippscores.data.model.MatchHighlight
 import com.example.tippscores.data.model.MatchStatistic
 import com.example.tippscores.data.remote.NetworkModule
 import com.google.gson.JsonArray
@@ -103,7 +104,8 @@ class MatchDetailsRepository(
                     homeTeam = homeTeam,
                     awayTeam = awayTeam
                 ).awayLineup,
-            headToHead = h?.headToHead.orEmpty()
+            headToHead = h?.headToHead.orEmpty(),
+            highlight = h?.highlight
         )
     }
 
@@ -112,7 +114,8 @@ class MatchDetailsRepository(
         val details: JsonObject?,
         val statistics: JsonElement?,
         val events: JsonElement?,
-        val headToHead: List<HeadToHeadMatch> = emptyList()
+        val headToHead: List<HeadToHeadMatch> = emptyList(),
+        val highlight: MatchHighlight? = null
     )
 
     private suspend fun fetchHighlightlyMatch(
@@ -174,12 +177,36 @@ class MatchDetailsRepository(
                 emptyList()
             }
 
+            val highlight = try {
+                val matchDate = candidate?.date?.take(10)
+                val highlightResponse = NetworkModule.highlightlyApi.getHighlights(
+                    apiKey = key,
+                    date = matchDate
+                )
+                highlightResponse.data.orEmpty()
+                    .firstOrNull { it.match?.id == id }
+                    ?.let { item ->
+                        MatchHighlight(
+                            id = item.id.orEmpty(),
+                            title = item.title.orEmpty(),
+                            url = item.url,
+                            embedUrl = item.embedUrl,
+                            imageUrl = item.imgUrl,
+                            description = item.description,
+                            type = item.type
+                        )
+                    }
+            } catch (_: Exception) {
+                null
+            }
+
             HighlightlyMatchDetails(
                 id = id,
                 details = details,
                 statistics = statistics,
                 events = events,
-                headToHead = h2h
+                headToHead = h2h,
+                highlight = highlight
             )
         } catch (_: HttpException) {
             null
