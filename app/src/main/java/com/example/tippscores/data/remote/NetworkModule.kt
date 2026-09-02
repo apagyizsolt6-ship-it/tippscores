@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonDeserializationContext
 import com.google.gson.JsonDeserializer
 import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -13,7 +14,6 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Query
 import retrofit2.http.Url
-import com.google.gson.JsonObject
 import java.lang.reflect.Type
 
 // ============================================================
@@ -84,13 +84,7 @@ data class StatpalDailyResponseDto(
 )
 
 // ============================================================
-// KÖZÖS SEGÉDFÜGGVÉNY: "OBJEKTUM VAGY TÖMB" FELOLDÁS
-//
-// A StatPal válaszaiban több helyen is előfordul ugyanaz a minta:
-// ha egy gyűjteményben csak 1 elem van, sima objektumként küldi
-// ("match": {...} / "league": {...}), ha több, akkor tömbként
-// ("match": [{...}, {...}]). Ez a függvény mindkét alakot ugyanúgy
-// egy listává alakítja, hogy sehol ne vesszen el emiatt elem.
+// "OBJEKTUM VAGY TÖMB" FELDOLGOZÁS
 // ============================================================
 
 private fun <T> parseObjectOrArrayList(
@@ -209,12 +203,6 @@ class StatpalLeagueItemDeserializer :
 
 // ============================================================
 // STATPAL DAILY DESERIALIZER
-//
-// A válasz tetején egy vagy több "matches_..." (vagy "live_matches")
-// kulcs is szerepelhet. Korábban csak az elsőt dolgoztuk fel - most
-// mindegyiket összefésüljük, hogy egyetlen bajnokság se maradjon ki.
-// A "league" mezőre is ráteszünk ugyanazt az objektum/tömb védelmet,
-// ami eddig csak a "match" mezőnél volt meg.
 // ============================================================
 
 class StatpalDailyDeserializer :
@@ -264,7 +252,7 @@ class StatpalDailyDeserializer :
                     try {
                         latestUpdated = it.asString
                     } catch (_: Exception) {
-                        // marad az előző érték
+                        // előző érték marad
                     }
                 }
         }
@@ -306,12 +294,6 @@ interface StatpalApiService {
 
 // ============================================================
 // STATPAL MÉRKŐZÉS RÉSZLETEK
-//
-// A StatPal külön végpontokat biztosít az élő statisztikákhoz,
-// play-by-play eseményekhez és keretekhez. A részletes JSON-t itt
-// JsonObjectként vesszük át, mert a szolgáltató többféle mezőalakot
-// használhat ligától / adatkörtől függően. A UI-réteg egy közös,
-// stabil modellt kap.
 // ============================================================
 
 interface StatpalMatchDetailsApiService {
@@ -324,7 +306,7 @@ interface StatpalMatchDetailsApiService {
 }
 
 // ============================================================
-// HIGHLIGHTLY DTO
+// HIGHLIGHTLY - HIGHLIGHTS DTO
 // ============================================================
 
 data class HighlightlyMatchRefDto(
@@ -352,10 +334,62 @@ data class HighlightlyResponseDto(
 )
 
 // ============================================================
+// HIGHLIGHTLY - CSAPAT DTO
+//
+// A /matches válasz homeTeam és awayTeam objektumai ezt
+// a struktúrát használják.
+// ============================================================
+
+data class HighlightlyTeamDto(
+    @SerializedName("id")
+    val id: String?,
+
+    @SerializedName("logo")
+    val logo: String?,
+
+    @SerializedName("name")
+    val name: String?,
+
+    @SerializedName("type")
+    val type: String? = null
+)
+
+// ============================================================
+// HIGHLIGHTLY - MÉRKŐZÉS DTO
+// ============================================================
+
+data class HighlightlyMatchDto(
+    @SerializedName("id")
+    val id: String?,
+
+    @SerializedName("date")
+    val date: String?,
+
+    @SerializedName("homeTeam")
+    val homeTeam: HighlightlyTeamDto?,
+
+    @SerializedName("awayTeam")
+    val awayTeam: HighlightlyTeamDto?
+)
+
+// ============================================================
+// HIGHLIGHTLY MATCHES RESPONSE
+// ============================================================
+
+data class HighlightlyMatchesResponseDto(
+    @SerializedName("data")
+    val data: List<HighlightlyMatchDto>?
+)
+
+// ============================================================
 // HIGHLIGHTLY API
 // ============================================================
 
 interface HighlightlyApiService {
+
+    // --------------------------------------------------------
+    // Videó/highlight lista
+    // --------------------------------------------------------
 
     @GET("highlights")
     suspend fun getHighlights(
@@ -365,6 +399,34 @@ interface HighlightlyApiService {
         @Query("date")
         date: String? = null
     ): HighlightlyResponseDto
+
+    // --------------------------------------------------------
+    // TELJES NAPI MÉRKŐZÉSLISTA
+    //
+    // Innen kapjuk:
+    // homeTeam.logo
+    // awayTeam.logo
+    //
+    // A limit maximum 100.
+    // --------------------------------------------------------
+
+    @GET("matches")
+    suspend fun getMatches(
+        @Header("x-rapidapi-key")
+        apiKey: String,
+
+        @Query("date")
+        date: String,
+
+        @Query("timezone")
+        timezone: String = "Europe/Budapest",
+
+        @Query("limit")
+        limit: Int = 100,
+
+        @Query("offset")
+        offset: Int = 0
+    ): HighlightlyMatchesResponseDto
 }
 
 // ============================================================
@@ -401,6 +463,10 @@ object NetworkModule {
             .addInterceptor(loggingInterceptor)
             .build()
 
+    // ========================================================
+    // STATPAL
+    // ========================================================
+
     val statpalApi: StatpalApiService by lazy {
 
         Retrofit.Builder()
@@ -413,6 +479,10 @@ object NetworkModule {
             .create(StatpalApiService::class.java)
     }
 
+    // ========================================================
+    // STATPAL MATCH DETAILS
+    // ========================================================
+
     val statpalMatchDetailsApi: StatpalMatchDetailsApiService by lazy {
 
         Retrofit.Builder()
@@ -424,6 +494,10 @@ object NetworkModule {
             .build()
             .create(StatpalMatchDetailsApiService::class.java)
     }
+
+    // ========================================================
+    // HIGHLIGHTLY
+    // ========================================================
 
     val highlightlyApi: HighlightlyApiService by lazy {
 
