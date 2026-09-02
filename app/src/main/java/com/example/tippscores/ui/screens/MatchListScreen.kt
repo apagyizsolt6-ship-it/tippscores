@@ -206,16 +206,10 @@ fun MatchListScreen(
     // SZŰRÉS: KERESÉS -> FÜL -> BAJNOKSÁG
     // ========================================================
 
-    val searched =
-        if (searchQuery.isBlank()) {
-            matches
-        } else {
-            val q = searchQuery.trim()
-            matches.filter {
-                it.homeTeam.contains(q, ignoreCase = true) ||
-                    it.awayTeam.contains(q, ignoreCase = true)
-            }
-        }
+    val searched = smartSearchMatches(
+        matches = matches,
+        query = searchQuery
+    )
 
     val tabFiltered =
         when (selectedTab) {
@@ -559,7 +553,7 @@ fun MatchListScreen(
 
                 placeholder = {
                     Text(
-                        "Csapat keresése…",
+                        "Csapat, liga, élő meccs keresése…",
                         fontSize = 13.sp
                     )
                 },
@@ -1690,6 +1684,135 @@ private fun dateForOffset(
                 )
             )
         }
+}
+
+// ============================================================
+// OKOS KERESŐ
+// ============================================================
+
+private fun normalizeSearchText(value: String): String {
+    return value
+        .lowercase(Locale("hu", "HU"))
+        .replace('á', 'a')
+        .replace('é', 'e')
+        .replace('í', 'i')
+        .replace('ó', 'o')
+        .replace('ö', 'o')
+        .replace('ő', 'o')
+        .replace('ú', 'u')
+        .replace('ü', 'u')
+        .replace('ű', 'u')
+        .replace("ß", "ss")
+        .trim()
+}
+
+private fun searchAliases(value: String): Set<String> {
+    val normalized = normalizeSearchText(value)
+    return buildSet {
+        add(normalized)
+        when (normalized) {
+            "elo", "live" -> {
+                add("elo")
+                add("live")
+            }
+            "angol", "anglia", "english" -> {
+                add("angol")
+                add("anglia")
+                add("england")
+                add("premier league")
+            }
+            "nemet", "nemetorszag", "german" -> {
+                add("nemet")
+                add("nemetorszag")
+                add("germany")
+                add("bundesliga")
+            }
+            "olasz", "olaszorszag", "italian" -> {
+                add("olasz")
+                add("olaszorszag")
+                add("italy")
+                add("serie a")
+            }
+            "spanyol", "spanyolorszag", "spanish" -> {
+                add("spanyol")
+                add("spanyolorszag")
+                add("spain")
+                add("la liga")
+            }
+            "francia", "franciaorszag", "french" -> {
+                add("francia")
+                add("franciaorszag")
+                add("france")
+                add("ligue 1")
+            }
+        }
+    }
+}
+
+private fun smartSearchMatches(
+    matches: List<Match>,
+    query: String
+): List<Match> {
+    val cleanQuery = normalizeSearchText(query)
+    if (cleanQuery.isBlank()) return matches
+
+    val tokens = cleanQuery
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+
+    if (tokens.isEmpty()) return matches
+
+    data class RankedMatch(
+        val match: Match,
+        val score: Int
+    )
+
+    return matches
+        .mapNotNull { match ->
+            val home = normalizeSearchText(match.homeTeam)
+            val away = normalizeSearchText(match.awayTeam)
+            val league = normalizeSearchText(match.leagueName)
+            val country = normalizeSearchText(match.leagueCountry)
+            val combined = "$home $away $league $country"
+
+            var score = 0
+            var allTokensMatch = true
+
+            for (token in tokens) {
+                val aliases = searchAliases(token)
+                val tokenMatches = aliases.any { alias ->
+                    alias.isNotBlank() && combined.contains(alias)
+                }
+
+                if (!tokenMatches) {
+                    allTokensMatch = false
+                    break
+                }
+
+                when {
+                    home == token || away == token -> score += 100
+                    home.startsWith(token) || away.startsWith(token) -> score += 80
+                    home.contains(token) || away.contains(token) -> score += 60
+                    league.contains(token) || country.contains(token) -> score += 40
+                    else -> score += 20
+                }
+            }
+
+            if (!allTokensMatch) {
+                null
+            } else {
+                if (match.isLive && (cleanQuery == "elo" || cleanQuery == "live")) {
+                    score += 50
+                }
+                RankedMatch(match, score)
+            }
+        }
+        .sortedWith(
+            compareByDescending<RankedMatch> { it.score }
+                .thenBy { normalizeSearchText(it.match.homeTeam) }
+                .thenBy { normalizeSearchText(it.match.awayTeam) }
+        )
+        .map { it.match }
 }
 
 // ============================================================
