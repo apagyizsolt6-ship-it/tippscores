@@ -122,8 +122,7 @@ fun MatchDetailScreen(
                 .padding(paddingValues),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
                 horizontal = 14.dp,
-                vertical = 14.dp,
-                bottom = 24.dp
+                vertical = 14.dp
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
