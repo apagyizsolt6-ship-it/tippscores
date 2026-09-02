@@ -4,7 +4,8 @@ data class MatchDetails(
     val statistics: List<MatchStatistic> = emptyList(),
     val events: List<MatchEvent> = emptyList(),
     val homeLineup: MatchLineup = MatchLineup(),
-    val awayLineup: MatchLineup = MatchLineup()
+    val awayLineup: MatchLineup = MatchLineup(),
+    val headToHead: List<HeadToHeadMatch> = emptyList()
 ) {
     val hasStatistics: Boolean get() = statistics.isNotEmpty()
     val hasEvents: Boolean get() = events.isNotEmpty()
@@ -14,6 +15,16 @@ data class MatchDetails(
             awayLineup.startingPlayers.isNotEmpty() ||
             awayLineup.substitutePlayers.isNotEmpty()
 }
+
+data class HeadToHeadMatch(
+    val date: String = "",
+    val homeTeam: String,
+    val awayTeam: String,
+    val homeScore: String = "-",
+    val awayScore: String = "-",
+    val homeLogoUrl: String = "",
+    val awayLogoUrl: String = ""
+)
 
 data class MatchStatistic(
     val label: String,
