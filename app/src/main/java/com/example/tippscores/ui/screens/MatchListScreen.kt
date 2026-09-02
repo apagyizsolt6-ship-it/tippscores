@@ -1711,37 +1711,38 @@ private fun searchAliases(value: String): Set<String> {
     return buildSet {
         add(normalized)
         when (normalized) {
-            "elo", "live" -> {
-                add("elo")
-                add("live")
-            }
-            "angol", "anglia", "english" -> {
+            "angol", "anglia", "english", "england" -> {
                 add("angol")
                 add("anglia")
+                add("english")
                 add("england")
                 add("premier league")
             }
-            "nemet", "nemetorszag", "german" -> {
+            "nemet", "nemetorszag", "german", "germany" -> {
                 add("nemet")
                 add("nemetorszag")
+                add("german")
                 add("germany")
                 add("bundesliga")
             }
-            "olasz", "olaszorszag", "italian" -> {
+            "olasz", "olaszorszag", "italian", "italy" -> {
                 add("olasz")
                 add("olaszorszag")
+                add("italian")
                 add("italy")
                 add("serie a")
             }
-            "spanyol", "spanyolorszag", "spanish" -> {
+            "spanyol", "spanyolorszag", "spanish", "spain" -> {
                 add("spanyol")
                 add("spanyolorszag")
+                add("spanish")
                 add("spain")
                 add("la liga")
             }
-            "francia", "franciaorszag", "french" -> {
+            "francia", "franciaorszag", "french", "france" -> {
                 add("francia")
                 add("franciaorszag")
+                add("french")
                 add("france")
                 add("ligue 1")
             }
@@ -1762,6 +1763,11 @@ private fun smartSearchMatches(
 
     if (tokens.isEmpty()) return matches
 
+    // Az "élő/live" különleges keresési feltétel:
+    // ne szöveget keressen, hanem valóban csak élő meccseket adjon vissza.
+    val liveRequested = tokens.any { it == "elo" || it == "live" }
+    val textTokens = tokens.filterNot { it == "elo" || it == "live" }
+
     data class RankedMatch(
         val match: Match,
         val score: Int
@@ -1769,43 +1775,45 @@ private fun smartSearchMatches(
 
     return matches
         .mapNotNull { match ->
+            if (liveRequested && !match.isLive) {
+                return@mapNotNull null
+            }
+
             val home = normalizeSearchText(match.homeTeam)
             val away = normalizeSearchText(match.awayTeam)
             val league = normalizeSearchText(match.leagueName)
             val country = normalizeSearchText(match.leagueCountry)
-            val combined = "$home $away $league $country"
 
-            var score = 0
-            var allTokensMatch = true
+            var score = if (liveRequested) 50 else 0
 
-            for (token in tokens) {
+            for (token in textTokens) {
                 val aliases = searchAliases(token)
-                val tokenMatches = aliases.any { alias ->
-                    alias.isNotBlank() && combined.contains(alias)
-                }
 
-                if (!tokenMatches) {
-                    allTokensMatch = false
-                    break
-                }
+                fun fieldMatch(field: String): Boolean =
+                    aliases.any { alias ->
+                        alias.isNotBlank() && field.contains(alias)
+                    }
+
+                val homeExact = aliases.any { it.isNotBlank() && home == it }
+                val awayExact = aliases.any { it.isNotBlank() && away == it }
+                val homeStarts = aliases.any { it.isNotBlank() && home.startsWith(it) }
+                val awayStarts = aliases.any { it.isNotBlank() && away.startsWith(it) }
+                val homeContains = fieldMatch(home)
+                val awayContains = fieldMatch(away)
+                val leagueMatch = fieldMatch(league)
+                val countryMatch = fieldMatch(country)
 
                 when {
-                    home == token || away == token -> score += 100
-                    home.startsWith(token) || away.startsWith(token) -> score += 80
-                    home.contains(token) || away.contains(token) -> score += 60
-                    league.contains(token) || country.contains(token) -> score += 40
-                    else -> score += 20
+                    homeExact || awayExact -> score += 100
+                    homeStarts || awayStarts -> score += 80
+                    homeContains || awayContains -> score += 60
+                    leagueMatch -> score += 45
+                    countryMatch -> score += 40
+                    else -> return@mapNotNull null
                 }
             }
 
-            if (!allTokensMatch) {
-                null
-            } else {
-                if (match.isLive && (cleanQuery == "elo" || cleanQuery == "live")) {
-                    score += 50
-                }
-                RankedMatch(match, score)
-            }
+            RankedMatch(match, score)
         }
         .sortedWith(
             compareByDescending<RankedMatch> { it.score }
