@@ -62,7 +62,8 @@ fun MatchDetailScreen(
     favoriteTeamNames: Set<String>,
     onBack: () -> Unit,
     onToggleFavorite: (String) -> Unit,
-    onToggleFollowTeam: (String) -> Unit
+    onToggleFollowTeam: (String) -> Unit,
+    onTeamClick: (String, String) -> Unit
 ) {
     val colors = LocalAppColors.current
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -161,7 +162,8 @@ fun MatchDetailScreen(
                     match = match,
                     colors = colors,
                     favoriteTeamNames = favoriteTeamNames,
-                    onToggleFollowTeam = onToggleFollowTeam
+                    onToggleFollowTeam = onToggleFollowTeam,
+                    onTeamClick = onTeamClick
                 )
             }
 
@@ -334,7 +336,8 @@ private fun MatchHeaderCard(
     match: Match,
     colors: com.example.tippscores.ui.theme.AppColorScheme,
     favoriteTeamNames: Set<String>,
-    onToggleFollowTeam: (String) -> Unit
+    onToggleFollowTeam: (String) -> Unit,
+    onTeamClick: (String, String) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -363,7 +366,8 @@ private fun MatchHeaderCard(
                 score = match.homeScore,
                 isFollowed = favoriteTeamNames.contains(match.homeTeam),
                 primaryText = colors.primaryText,
-                onFollowClick = { onToggleFollowTeam(match.homeTeam) }
+                onFollowClick = { onToggleFollowTeam(match.homeTeam) },
+                onProfileClick = { onTeamClick(match.homeTeam, match.homeTeamLogo) }
             )
 
             Spacer(Modifier.height(12.dp))
@@ -374,7 +378,8 @@ private fun MatchHeaderCard(
                 score = match.awayScore,
                 isFollowed = favoriteTeamNames.contains(match.awayTeam),
                 primaryText = colors.primaryText,
-                onFollowClick = { onToggleFollowTeam(match.awayTeam) }
+                onFollowClick = { onToggleFollowTeam(match.awayTeam) },
+                onProfileClick = { onTeamClick(match.awayTeam, match.awayTeamLogo) }
             )
 
             Spacer(Modifier.height(8.dp))
@@ -395,7 +400,8 @@ private fun TeamDetailRow(
     score: Int?,
     isFollowed: Boolean,
     primaryText: Color,
-    onFollowClick: () -> Unit
+    onFollowClick: () -> Unit,
+    onProfileClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -410,13 +416,22 @@ private fun TeamDetailRow(
         )
         Spacer(Modifier.width(10.dp))
 
-        Text(
-            text = (if (isFollowed) "● " else "") + name,
-            color = if (isFollowed) Color(0xFF2563EB) else primaryText,
-            fontWeight = FontWeight.Bold,
-            fontSize = 17.sp,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = (if (isFollowed) "● " else "") + name,
+                color = if (isFollowed) Color(0xFF2563EB) else primaryText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                modifier = Modifier.clickable(onClick = onProfileClick)
+            )
+            Text(
+                text = "Csapatprofil",
+                color = Color(0xFF2563EB),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable(onClick = onProfileClick)
+            )
+        }
 
         Text(
             text = score?.toString() ?: "-",
@@ -502,6 +517,13 @@ private fun StatisticsSection(
 @Composable
 private fun StatisticRow(stat: com.example.tippscores.data.model.MatchStatistic) {
     val colors = LocalAppColors.current
+
+    val homeNumber = stat.home.replace(",", ".").replace("%", "").trim().toFloatOrNull()
+    val awayNumber = stat.away.replace(",", ".").replace("%", "").trim().toFloatOrNull()
+    val total = if (homeNumber != null && awayNumber != null) homeNumber + awayNumber else 0f
+    val homeRatio = if (total > 0f) (homeNumber ?: 0f) / total else 0.5f
+    val awayRatio = if (total > 0f) (awayNumber ?: 0f) / total else 0.5f
+
     Column(modifier = Modifier.padding(vertical = 7.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -512,14 +534,14 @@ private fun StatisticRow(stat: com.example.tippscores.data.model.MatchStatistic)
                 color = colors.primaryText,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.width(46.dp)
             )
             Text(
                 stat.label,
                 color = colors.secondaryText,
                 fontSize = 10.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(90.dp)
+                modifier = Modifier.weight(1f)
             )
             Text(
                 stat.away,
@@ -527,8 +549,33 @@ private fun StatisticRow(stat: com.example.tippscores.data.model.MatchStatistic)
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
                 textAlign = TextAlign.End,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.width(46.dp)
             )
+        }
+
+        if (homeNumber != null && awayNumber != null && total > 0f) {
+            Spacer(Modifier.height(5.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(50)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(homeRatio.coerceIn(0.05f, 0.95f))
+                        .height(5.dp)
+                        .background(Color(0xFF2563EB))
+                )
+                Spacer(Modifier.width(2.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(awayRatio.coerceIn(0.05f, 0.95f))
+                        .height(5.dp)
+                        .background(Color(0xFF94A3B8))
+                )
+            }
         }
     }
 }
