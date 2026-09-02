@@ -2,13 +2,16 @@ package com.example.tippscores.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,7 +43,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,6 +61,7 @@ import com.example.tippscores.data.model.MatchEvent
 import com.example.tippscores.data.model.HeadToHeadMatch
 import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.ui.theme.LocalAppColors
+import java.util.Locale
 
 @Composable
 fun MatchDetailScreen(
@@ -679,23 +687,14 @@ private fun LineupSection(
                 Text(meta, color = colors.tertiaryText, fontSize = 10.sp)
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
 
             if (lineup.startingPlayers.isNotEmpty()) {
-                Text(
-                    "Kezdő 11",
-                    color = colors.secondaryText,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp
-                )
-                Spacer(Modifier.height(5.dp))
-                lineup.startingPlayers.forEach { player ->
-                    PlayerRow(player)
-                }
+                PitchView(lineup = lineup)
             }
 
             if (lineup.substitutePlayers.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
                 Text(
                     "Cserepad",
                     color = colors.secondaryText,
@@ -708,6 +707,263 @@ private fun LineupSection(
                 }
             }
         }
+    }
+}
+
+// ================================================================
+// PÁLYAKÉP (kezdő 11, formáció szerint elrendezve)
+// ================================================================
+
+@Composable
+private fun PitchView(lineup: MatchLineup) {
+
+    val rows = remember(lineup) { buildPitchRows(lineup) }
+
+    if (rows.isEmpty()) {
+        return
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.68f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF1E8449), Color(0xFF14532D))
+                )
+            )
+    ) {
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+
+            val lineColor = Color.White.copy(alpha = 0.45f)
+            val stroke = Stroke(width = 1.5.dp.toPx())
+            val margin = 8.dp.toPx()
+
+            drawRect(
+                color = lineColor,
+                topLeft = Offset(margin, margin),
+                size = Size(size.width - margin * 2, size.height - margin * 2),
+                style = stroke
+            )
+
+            drawLine(
+                color = lineColor,
+                start = Offset(margin, size.height / 2f),
+                end = Offset(size.width - margin, size.height / 2f),
+                strokeWidth = stroke.width
+            )
+
+            drawCircle(
+                color = lineColor,
+                radius = size.width * 0.16f,
+                center = Offset(size.width / 2f, size.height / 2f),
+                style = stroke
+            )
+
+            val boxWidth = size.width * 0.56f
+            val boxHeight = size.height * 0.13f
+
+            drawRect(
+                color = lineColor,
+                topLeft = Offset((size.width - boxWidth) / 2f, margin),
+                size = Size(boxWidth, boxHeight),
+                style = stroke
+            )
+
+            drawRect(
+                color = lineColor,
+                topLeft = Offset((size.width - boxWidth) / 2f, size.height - margin - boxHeight),
+                size = Size(boxWidth, boxHeight),
+                style = stroke
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 14.dp, horizontal = 4.dp),
+
+            verticalArrangement = Arrangement.SpaceEvenly
+        ) {
+
+            // A pályán a kapus legyen legalul, a támadók legfelül -
+            // ezért fordítva jelenítjük meg, mint ahogy a formáció
+            // (védők -> középpályások -> támadók) sorolja őket.
+            rows.asReversed().forEach { row ->
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    row.forEach { player ->
+                        PitchPlayerMarker(player)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PitchPlayerMarker(player: LineupPlayer) {
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(56.dp)
+    ) {
+
+        Box {
+
+            if (!player.photoUrl.isNullOrBlank()) {
+
+                AsyncImage(
+                    model = player.photoUrl,
+                    contentDescription = "${player.name} fotója",
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, Color.White, CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+
+            } else {
+
+                Surface(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .border(1.5.dp, Color.White, CircleShape),
+                    shape = CircleShape,
+                    color = Color(0xFF0F172A).copy(alpha = 0.55f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = player.number?.takeIf { it.isNotBlank() } ?: "👤",
+                            color = Color.White,
+                            fontSize = if (player.number.isNullOrBlank()) 14.sp else 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            if (player.isCaptain) {
+
+                Surface(
+                    modifier = Modifier
+                        .size(15.dp)
+                        .align(Alignment.TopEnd),
+                    shape = CircleShape,
+                    color = Color(0xFFFBBF24)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "C",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF422006)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        Text(
+            text = shortenPlayerName(player.name),
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(56.dp)
+        )
+    }
+}
+
+/** Csak a vezetéknevet mutatjuk a pályán - kevés a hely egy teljes névnek. */
+private fun shortenPlayerName(fullName: String): String {
+    val parts = fullName.trim().split(" ").filter { it.isNotBlank() }
+    return when {
+        parts.isEmpty() -> fullName
+        else -> parts.last()
+    }
+}
+
+/**
+ * A kezdő 11-et sorokba rendezi (kapus, védők, középpályások, támadók)
+ * a formáció string alapján (pl. "4-3-3"). Ha a formáció hiányzik vagy
+ * nem egyezik a játékosok számával, egy ésszerű alapértelmezett
+ * elrendezést használunk, hogy akkor is legyen pályakép.
+ */
+private fun buildPitchRows(lineup: MatchLineup): List<List<LineupPlayer>> {
+
+    val players = lineup.startingPlayers
+
+    if (players.isEmpty()) {
+        return emptyList()
+    }
+
+    val keeperIndex = players.indexOfFirst { player ->
+        val pos = player.position?.uppercase(Locale.ROOT).orEmpty()
+        pos.contains("GK") || pos.contains("KAPUS") ||
+            pos.contains("GOALKEEPER") || pos.contains("KEEPER")
+    }.let { if (it >= 0) it else 0 }
+
+    val keeper = players[keeperIndex]
+    val outfield = players.filterIndexed { index, _ -> index != keeperIndex }
+
+    val rowSizes = parseFormationRows(lineup.formation, outfield.size)
+
+    val rows = mutableListOf<List<LineupPlayer>>()
+    rows.add(listOf(keeper))
+
+    var cursor = 0
+    for (rowSize in rowSizes) {
+        val row = outfield.drop(cursor).take(rowSize)
+        if (row.isNotEmpty()) {
+            rows.add(row)
+        }
+        cursor += rowSize
+    }
+
+    if (cursor < outfield.size) {
+        rows.add(outfield.drop(cursor))
+    }
+
+    return rows
+}
+
+private fun parseFormationRows(formation: String?, outfieldCount: Int): List<Int> {
+
+    val parsed = formation
+        ?.split("-", "–", ":", "/")
+        ?.mapNotNull { it.trim().toIntOrNull() }
+        ?.filter { it > 0 }
+        .orEmpty()
+
+    val sum = parsed.sum()
+
+    return when {
+        parsed.isNotEmpty() && sum == outfieldCount -> parsed
+
+        outfieldCount > 0 -> {
+            // Nincs használható formáció - kb. 3-4 fős sorokra osztjuk,
+            // hogy akkor is legyen áttekinthető pályakép.
+            val rows = mutableListOf<Int>()
+            var remaining = outfieldCount
+            while (remaining > 0) {
+                val take = if (remaining > 4) 4 else remaining
+                rows.add(take)
+                remaining -= take
+            }
+            rows
+        }
+
+        else -> emptyList()
     }
 }
 
