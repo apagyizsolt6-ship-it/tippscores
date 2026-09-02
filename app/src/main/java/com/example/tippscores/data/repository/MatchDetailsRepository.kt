@@ -43,6 +43,8 @@ class MatchDetailsRepository(
 
         val h = highlightly.await()
 
+        val boxScoreElement = h?.id?.let { fetchHighlightlyBoxScore(it) }
+
         val highlightlyStatistics = h?.details?.let { parseHighlightlyStatistics(it) }
             .orEmpty()
             .ifEmpty {
@@ -62,8 +64,8 @@ class MatchDetailsRepository(
 
         val highlightlyLineups = h?.details?.let {
             Pair(
-                parseLineupFromMatchObject(it, homeTeam, true),
-                parseLineupFromMatchObject(it, awayTeam, false)
+                enrichLineupPhotos(parseLineupFromMatchObject(it, homeTeam, true), boxScoreElement),
+                enrichLineupPhotos(parseLineupFromMatchObject(it, awayTeam, false), boxScoreElement)
             )
         }
 
@@ -170,6 +172,33 @@ class MatchDetailsRepository(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private suspend fun fetchHighlightlyBoxScore(matchId: String): JsonElement? {
+        val key = highlightlyKeyProvider().trim()
+        if (key.isEmpty()) return null
+        return try { NetworkModule.highlightlyApi.getBoxScore(key, matchId) } catch (_: Exception) { null }
+    }
+
+    private fun enrichLineupPhotos(lineup: MatchLineup, boxScore: JsonElement?): MatchLineup {
+        if (!lineup.hasPlayers() || boxScore == null) return lineup
+        val photos = mutableMapOf<String, String>()
+        collectPlayerPhotos(boxScore, photos)
+        if (photos.isEmpty()) return lineup
+        fun enrich(list: List<LineupPlayer>) = list.map { p -> p.copy(photoUrl = p.photoUrl?.takeIf { it.isNotBlank() } ?: photos[normalize(p.name)]) }
+        return lineup.copy(startingPlayers = enrich(lineup.startingPlayers), substitutePlayers = enrich(lineup.substitutePlayers))
+    }
+
+    private fun collectPlayerPhotos(element: JsonElement?, out: MutableMap<String, String>) {
+        if (element == null || element.isJsonNull) return
+        if (element.isJsonArray) { element.asJsonArray.forEach { collectPlayerPhotos(it, out) }; return }
+        if (!element.isJsonObject) return
+        val obj = element.asJsonObject
+        val player = obj.get("player")?.takeIf { it.isJsonObject }?.asJsonObject
+        val name = firstString(obj, "name", "player_name", "playerName", "full_name") ?: player?.let { firstString(it, "name", "full_name", "fullName") }
+        val photo = firstString(obj, "logo", "photo", "photo_url", "photoUrl", "image", "image_url", "avatar") ?: player?.let { firstString(it, "logo", "photo", "photo_url", "photoUrl", "image", "image_url", "avatar") }
+        if (!name.isNullOrBlank() && !photo.isNullOrBlank()) out[normalize(name)] = photo
+        obj.entrySet().forEach { (_, child) -> collectPlayerPhotos(child, out) }
     }
 
     private fun parseHighlightlyStatistics(root: JsonObject): List<MatchStatistic> {
