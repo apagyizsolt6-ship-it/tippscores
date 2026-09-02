@@ -2,10 +2,14 @@ package com.example.tippscores.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 class ApiPreferences(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("api_settings", Context.MODE_PRIVATE)
+
+    private val gson = Gson()
 
     var statpalApiKey: String
         get() = prefs.getString("statpal_key", "") ?: ""
@@ -38,6 +42,28 @@ class ApiPreferences(context: Context) {
     }
 
     // ========================================================
+    // KEDVENC CSAPATOK
+    //
+    // A csapat NEVE a kulcs (nem az API id-je, mert az gyakran
+    // üres alacsonyabb szintű bajnokságoknál). Ha egy követett
+    // csapat játszik - bármelyik napon, bármelyik meccsén -,
+    // az a "Kedvencek" fülön megjelenik.
+    // ========================================================
+
+    var favoriteTeamNames: Set<String>
+        get() = prefs.getStringSet("favorite_teams", emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet("favorite_teams", value).apply()
+
+    fun toggleFavoriteTeam(teamName: String): Set<String> {
+        val updated = favoriteTeamNames.toMutableSet()
+        if (!updated.add(teamName)) {
+            updated.remove(teamName)
+        }
+        favoriteTeamNames = updated
+        return updated
+    }
+
+    // ========================================================
     // KIEMELT BAJNOKSÁGOK
     //
     // Az 5 alapértelmezett (top) bajnokság kiemelése kódban van
@@ -57,23 +83,15 @@ class ApiPreferences(context: Context) {
         get() = prefs.getStringSet("featured_removals", emptySet()) ?: emptySet()
         set(value) = prefs.edit().putStringSet("featured_removals", value).apply()
 
-    /**
-     * Be- vagy kikapcsolja egy bajnokság kiemelt állapotát.
-     * [isPreset] azt jelzi, hogy a bajnokság az 5 alapértelmezett
-     * kiemelt bajnokság egyike-e (ettől függ, melyik listát kell
-     * módosítani).
-     */
     fun toggleFeaturedLeague(leagueKey: String, isPreset: Boolean, currentlyFeatured: Boolean) {
 
         if (currentlyFeatured) {
-            // Kikapcsolás
             if (isPreset) {
                 featuredLeagueRemovals = featuredLeagueRemovals + leagueKey
             } else {
                 featuredLeagueAdditions = featuredLeagueAdditions - leagueKey
             }
         } else {
-            // Bekapcsolás
             if (isPreset) {
                 featuredLeagueRemovals = featuredLeagueRemovals - leagueKey
             } else {
@@ -81,4 +99,36 @@ class ApiPreferences(context: Context) {
             }
         }
     }
+
+    // ========================================================
+    // SÖTÉT MÓD
+    // ========================================================
+
+    var darkModeEnabled: Boolean
+        get() = prefs.getBoolean("dark_mode", false)
+        set(value) = prefs.edit().putBoolean("dark_mode", value).apply()
+
+    // ========================================================
+    // PUSH ÉRTESÍTÉS GÓLNÁL
+    // ========================================================
+
+    var goalNotificationsEnabled: Boolean
+        get() = prefs.getBoolean("goal_notifications", false)
+        set(value) = prefs.edit().putBoolean("goal_notifications", value).apply()
+
+    // Az utoljára ismert állás meccsenként ("matchId" -> "hazaiGól-vendégGól"),
+    // hogy a háttérellenőrzés fel tudja ismerni, mikor NŐTT egy gólszám
+    // (vagyis mikor kell értesítést küldeni). Csak a háttérfolyamat
+    // (GoalCheckWorker) használja, nem a UI.
+    var lastKnownScores: Map<String, String>
+        get() {
+            val raw = prefs.getString("last_known_scores", null) ?: return emptyMap()
+            return try {
+                val type = object : TypeToken<Map<String, String>>() {}.type
+                gson.fromJson(raw, type) ?: emptyMap()
+            } catch (e: Exception) {
+                emptyMap()
+            }
+        }
+        set(value) = prefs.edit().putString("last_known_scores", gson.toJson(value)).apply()
 }
