@@ -1,6 +1,7 @@
 package com.example.tippscores.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -267,4 +268,4 @@ private fun SectionCard(
 }
 
 private fun Modifier.clickableCompat(onClick: () -> Unit): Modifier =
-    androidx.compose.foundation.clickable(onClick = onClick)
+    clickable(onClick = onClick)
