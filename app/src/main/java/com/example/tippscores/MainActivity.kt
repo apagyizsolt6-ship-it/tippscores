@@ -50,9 +50,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private val detailsRepository by lazy {
-        com.example.tippscores.data.repository.MatchDetailsRepository {
-            apiPreferences.statpalApiKey
-        }
+        com.example.tippscores.data.repository.MatchDetailsRepository(
+            statpalKeyProvider = { apiPreferences.statpalApiKey },
+            highlightlyKeyProvider = { apiPreferences.highlightlyApiKey }
+        )
     }
 
     private val viewModel: MatchViewModel by viewModels {
