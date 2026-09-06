@@ -8,6 +8,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -216,7 +221,21 @@ class MainActivity : ComponentActivity() {
 
                     val currentTeamName = selectedTeamName
 
-                    if (currentTeamName != null) {
+                    val screenKey = when {
+                        currentTeamName != null -> "team"
+                        currentMatchId != null -> "match"
+                        else -> "list"
+                    }
+
+                    AnimatedContent(
+                        targetState = screenKey,
+                        transitionSpec = {
+                            fadeIn(tween(220)) togetherWith fadeOut(tween(160))
+                        },
+                        label = "screenTransition"
+                    ) { key ->
+
+                    if (key == "team" && currentTeamName != null) {
 
                         TeamProfileScreen(
                             teamName = currentTeamName,
@@ -228,7 +247,7 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
-                    } else if (currentMatchId != null) {
+                    } else if (key == "match" && currentMatchId != null) {
 
                         MatchDetailScreen(
 
@@ -243,6 +262,9 @@ class MainActivity : ComponentActivity() {
 
                             detailsError =
                                 detailsError,
+
+                            detailsRepository =
+                                detailsRepository,
 
                             onRetryDetails = {
                                 viewModel.retryMatchDetails()
@@ -344,6 +366,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         )
+                    }
                     }
                 }
             }
