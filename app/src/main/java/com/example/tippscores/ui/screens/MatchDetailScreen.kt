@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBarItem
@@ -36,10 +39,13 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +66,8 @@ import com.example.tippscores.data.model.MatchDetails
 import com.example.tippscores.data.model.MatchEvent
 import com.example.tippscores.data.model.HeadToHeadMatch
 import com.example.tippscores.data.model.MatchLineup
+import com.example.tippscores.data.model.PlayerProfile
+import com.example.tippscores.data.repository.MatchDetailsRepository
 import com.example.tippscores.ui.theme.LocalAppColors
 import java.util.Locale
 
@@ -69,6 +77,7 @@ fun MatchDetailScreen(
     details: MatchDetails?,
     detailsLoading: Boolean,
     detailsError: String?,
+    detailsRepository: MatchDetailsRepository,
     onRetryDetails: () -> Unit,
     favoriteTeamNames: Set<String>,
     onBack: () -> Unit,
@@ -78,6 +87,10 @@ fun MatchDetailScreen(
 ) {
     val colors = LocalAppColors.current
     var selectedTab by remember { mutableIntStateOf(0) }
+
+    // Kártyán megnyitott játékos (pálya nézetben rákoppintva).
+    var selectedPlayer by remember { mutableStateOf<LineupPlayer?>(null) }
+    var selectedPlayerTeam by remember { mutableStateOf("") }
 
     Scaffold(
         containerColor = colors.screenBackground,
@@ -319,13 +332,21 @@ fun MatchDetailScreen(
                         item {
                             LineupSection(
                                 title = match.homeTeam,
-                                lineup = details?.homeLineup ?: MatchLineup()
+                                lineup = details?.homeLineup ?: MatchLineup(),
+                                onPlayerClick = { player ->
+                                    selectedPlayer = player
+                                    selectedPlayerTeam = match.homeTeam
+                                }
                             )
                         }
                         item {
                             LineupSection(
                                 title = match.awayTeam,
-                                lineup = details?.awayLineup ?: MatchLineup()
+                                lineup = details?.awayLineup ?: MatchLineup(),
+                                onPlayerClick = { player ->
+                                    selectedPlayer = player
+                                    selectedPlayerTeam = match.awayTeam
+                                }
                             )
                         }
                         if (details?.hasLineups != true) {
@@ -355,6 +376,35 @@ fun MatchDetailScreen(
                 }
             }
         }
+    }
+
+    val currentPlayer = selectedPlayer
+
+    if (currentPlayer != null) {
+
+        var playerProfile by remember(currentPlayer.id) { mutableStateOf<PlayerProfile?>(null) }
+        var profileLoading by remember(currentPlayer.id) { mutableStateOf(currentPlayer.id != null) }
+
+        LaunchedEffect(currentPlayer.id) {
+            val playerId = currentPlayer.id
+            if (playerId != null) {
+                profileLoading = true
+                playerProfile = try {
+                    detailsRepository.fetchPlayerProfile(playerId)
+                } catch (e: Exception) {
+                    null
+                }
+                profileLoading = false
+            }
+        }
+
+        PlayerCardDialog(
+            player = currentPlayer,
+            teamName = selectedPlayerTeam,
+            profile = playerProfile,
+            profileLoading = profileLoading,
+            onDismiss = { selectedPlayer = null }
+        )
     }
 }
 
@@ -661,7 +711,8 @@ private fun eventIcon(type: String): String =
 @Composable
 private fun LineupSection(
     title: String,
-    lineup: MatchLineup
+    lineup: MatchLineup,
+    onPlayerClick: (LineupPlayer) -> Unit
 ) {
     val colors = LocalAppColors.current
     Surface(
@@ -690,7 +741,7 @@ private fun LineupSection(
             Spacer(Modifier.height(10.dp))
 
             if (lineup.startingPlayers.isNotEmpty()) {
-                PitchView(lineup = lineup)
+                PitchView(lineup = lineup, onPlayerClick = onPlayerClick)
             }
 
             if (lineup.substitutePlayers.isNotEmpty()) {
@@ -703,7 +754,7 @@ private fun LineupSection(
                 )
                 Spacer(Modifier.height(5.dp))
                 lineup.substitutePlayers.forEach { player ->
-                    PlayerRow(player)
+                    PlayerRow(player, onClick = { onPlayerClick(player) })
                 }
             }
         }
@@ -715,7 +766,7 @@ private fun LineupSection(
 // ================================================================
 
 @Composable
-private fun PitchView(lineup: MatchLineup) {
+private fun PitchView(lineup: MatchLineup, onPlayerClick: (LineupPlayer) -> Unit) {
 
     val rows = remember(lineup) { buildPitchRows(lineup) }
 
@@ -799,7 +850,7 @@ private fun PitchView(lineup: MatchLineup) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     row.forEach { player ->
-                        PitchPlayerMarker(player)
+                        PitchPlayerMarker(player, onClick = { onPlayerClick(player) })
                     }
                 }
             }
@@ -808,11 +859,13 @@ private fun PitchView(lineup: MatchLineup) {
 }
 
 @Composable
-private fun PitchPlayerMarker(player: LineupPlayer) {
+private fun PitchPlayerMarker(player: LineupPlayer, onClick: () -> Unit) {
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(56.dp)
+        modifier = Modifier
+            .width(56.dp)
+            .clickable(onClick = onClick)
     ) {
 
         Box {
@@ -881,6 +934,229 @@ private fun PitchPlayerMarker(player: LineupPlayer) {
             textAlign = TextAlign.Center,
             modifier = Modifier.width(56.dp)
         )
+    }
+}
+
+// ================================================================
+// JÁTÉKOSKÁRTYA (pályán/cserepadon koppintva)
+// ================================================================
+
+@Composable
+private fun PlayerCardDialog(
+    player: LineupPlayer,
+    teamName: String,
+    profile: PlayerProfile?,
+    profileLoading: Boolean,
+    onDismiss: () -> Unit
+) {
+    val colors = LocalAppColors.current
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = colors.cardBackground,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!player.photoUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = player.photoUrl,
+                            contentDescription = "${player.name} fotója",
+                            modifier = Modifier
+                                .size(96.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, Color(0xFF2563EB), CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Surface(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .border(2.dp, Color(0xFF2563EB), CircleShape),
+                            shape = CircleShape,
+                            color = colors.statusChipBackground
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    player.number?.takeIf { it.isNotBlank() } ?: "👤",
+                                    fontSize = 30.sp,
+                                    color = colors.primaryText,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    player.name + if (player.isCaptain) " (C)" else "",
+                    color = colors.primaryText,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(2.dp))
+
+                Text(
+                    listOfNotNull(
+                        teamName.takeIf { it.isNotBlank() },
+                        player.number?.takeIf { it.isNotBlank() }?.let { "#$it" },
+                        (profile?.position ?: player.position)?.takeIf { it.isNotBlank() }
+                    ).joinToString(" • "),
+                    color = colors.secondaryText,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = colors.divider)
+                Spacer(Modifier.height(14.dp))
+
+                when {
+
+                    profileLoading -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFF2563EB),
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    profile != null -> {
+                        PlayerInfoRow("Kor", profile.age)
+                        PlayerInfoRow("Nemzetiség", profile.nationality)
+                        PlayerInfoRow("Magasság", profile.height?.let { "$it cm" })
+                        PlayerInfoRow("Testsúly", profile.weight?.let { "$it kg" })
+                        PlayerInfoRow("Erősebb láb", translatePreferredFoot(profile.preferredFoot))
+                        PlayerInfoRow("Piaci érték", formatMarketValue(profile.marketValueEur))
+
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = colors.divider)
+                        Spacer(Modifier.height(10.dp))
+
+                        Text(
+                            "Szezon statisztika",
+                            color = colors.tertiaryText,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+
+                        PlayerInfoRow("Mérkőzések", profile.appearances)
+                        PlayerInfoRow("Gólok", profile.goals)
+                        PlayerInfoRow("Gólpasszok", profile.assists)
+                        PlayerInfoRow("Percek a pályán", profile.minutesPlayed)
+                        PlayerInfoRow("Értékelés", profile.rating)
+                        PlayerInfoRow("Sárga lap", profile.yellowCards)
+                        PlayerInfoRow("Piros lap", profile.redCards)
+                    }
+
+                    player.id == null -> {
+                        Text(
+                            "Ehhez a mérkőzéshez a StatPal nem ad játékos-azonosítót, így bővebb adat jelenleg nem tölthető be.",
+                            color = colors.tertiaryText,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    else -> {
+                        Text(
+                            "A további adatok jelenleg nem érhetők el ehhez a játékoshoz.",
+                            color = colors.tertiaryText,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onDismiss),
+                    shape = RoundedCornerShape(10.dp),
+                    color = colors.statusChipBackground
+                ) {
+                    Text(
+                        "Bezárás",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp),
+                        textAlign = TextAlign.Center,
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerInfoRow(label: String, value: String?) {
+    if (value.isNullOrBlank()) return
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+    ) {
+        Text(
+            label,
+            color = colors.tertiaryText,
+            fontSize = 11.sp,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            value,
+            color = colors.primaryText,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp
+        )
+    }
+}
+
+private fun translatePreferredFoot(foot: String?): String? =
+    when (foot?.trim()?.lowercase(Locale.ROOT)) {
+        "left" -> "Bal"
+        "right" -> "Jobb"
+        "both" -> "Mindkettő"
+        null, "" -> null
+        else -> foot
+    }
+
+private fun formatMarketValue(raw: String?): String? {
+    val value = raw?.toLongOrNull() ?: return null
+    return when {
+        value >= 1_000_000 -> "%.1f M €".format(value / 1_000_000.0)
+        value >= 1_000 -> "%.0f E €".format(value / 1_000.0)
+        else -> "$value €"
     }
 }
 
@@ -968,11 +1244,12 @@ private fun parseFormationRows(formation: String?, outfieldCount: Int): List<Int
 }
 
 @Composable
-private fun PlayerRow(player: LineupPlayer) {
+private fun PlayerRow(player: LineupPlayer, onClick: () -> Unit = {}) {
     val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

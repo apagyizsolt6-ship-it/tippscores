@@ -2,6 +2,7 @@ package com.example.tippscores.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,6 +56,32 @@ import com.example.tippscores.ui.components.LeagueHeader
 import com.example.tippscores.ui.components.MatchRow
 import com.example.tippscores.ui.components.SettingsDialog
 import com.example.tippscores.ui.theme.LocalAppColors
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import java.text.Collator
 import java.text.SimpleDateFormat
@@ -754,12 +782,11 @@ fun MatchListScreen(
             // TARTALOM
             // =================================================
 
-            Box(
-
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+            PullToRefreshArea(
+                onRefresh = onRefresh,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
 
                 when {
@@ -769,45 +796,7 @@ fun MatchListScreen(
                     // =========================================
 
                     isLoading -> {
-
-                        Column(
-
-                            modifier =
-                                Modifier.fillMaxSize(),
-
-                            horizontalAlignment =
-                                Alignment.CenterHorizontally,
-
-                            verticalArrangement =
-                                Arrangement.Center
-                        ) {
-
-                            CircularProgressIndicator(
-
-                                color =
-                                    Color(0xFF2563EB),
-
-                                strokeWidth =
-                                    3.dp
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.height(12.dp)
-                            )
-
-                            Text(
-
-                                text =
-                                    "Mérkőzések betöltése…",
-
-                                color =
-                                    colors.secondaryText,
-
-                                fontSize =
-                                    13.sp
-                            )
-                        }
+                        SkeletonLoadingList()
                     }
 
                     // =========================================
@@ -1284,19 +1273,24 @@ fun MatchListScreen(
                                     )
                                 }
 
-                                if (key !in collapsedLeagues) {
+                                items(
 
-                                    items(
+                                    items =
+                                        matchGroup,
 
-                                        items =
-                                            matchGroup,
+                                    key = {
+                                        it.id
+                                    }
 
-                                        key = {
-                                            it.id
-                                        }
+                                ) { match ->
 
-                                    ) { match ->
-
+                                    AnimatedVisibility(
+                                        visible = key !in collapsedLeagues,
+                                        enter = expandVertically(animationSpec = tween(220)) +
+                                            fadeIn(animationSpec = tween(180)),
+                                        exit = shrinkVertically(animationSpec = tween(180)) +
+                                            fadeOut(animationSpec = tween(140))
+                                    ) {
                                         MatchRow(
 
                                             match =
@@ -1318,6 +1312,211 @@ fun MatchListScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// ============================================================
+// CSONTVÁZ-EFFEKT BETÖLTÉSKOR
+// ============================================================
+
+@Composable
+private fun SkeletonLoadingList() {
+
+    val infiniteTransition =
+        rememberInfiniteTransition(label = "skeleton")
+
+    val shimmerAlpha by
+        infiniteTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 0.85f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(800, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+            label = "skeletonAlpha"
+        )
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 8.dp)
+    ) {
+        items(6) {
+            SkeletonMatchRow(shimmerAlpha)
+        }
+    }
+}
+
+@Composable
+private fun SkeletonMatchRow(alpha: Float) {
+
+    val colors = LocalAppColors.current
+    val shimmerColor = colors.statusChipBackground.copy(alpha = alpha)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = colors.cardBackground
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(shimmerColor)
+            )
+
+            Spacer(Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerColor)
+                )
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.42f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerColor)
+                )
+            }
+
+            Spacer(Modifier.width(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(width = 20.dp, height = 20.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(shimmerColor)
+            )
+        }
+    }
+}
+
+// ============================================================
+// HÚZD LE A FRISSÍTÉSHEZ
+//
+// Egyedi, gesztus-alapú megvalósítás (nem a Material3 beépített
+// pull-to-refresh komponense), mert a projekt Compose verziója
+// nem biztos, hogy tartalmazza azt a stabil formában - ez viszont
+// csak alap Compose Foundation API-kat használ, verziófüggetlen.
+//
+// A húzás csak akkor "él", ha az ujj a tartalom TETEJE közelében
+// indul (nem középről/aljáról) - így nem zavarja a normál görgetést.
+// ============================================================
+
+@Composable
+private fun PullToRefreshArea(
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val density = LocalDensity.current
+    val triggerPx = remember(density) { with(density) { 64.dp.toPx() } }
+    val maxPullPx = remember(density) { with(density) { 96.dp.toPx() } }
+    val armDistancePx = remember(density) { with(density) { 130.dp.toPx() } }
+
+    var rawOffset by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    var armed by remember { mutableStateOf(false) }
+
+    val animatedOffset by animateFloatAsState(
+        targetValue = rawOffset,
+        animationSpec = if (isDragging) {
+            snap()
+        } else {
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy)
+        },
+        label = "pullOffset"
+    )
+
+    Box(
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { start ->
+                        armed = start.y < armDistancePx
+                        isDragging = true
+                    },
+                    onDragEnd = {
+                        isDragging = false
+                        if (armed && rawOffset >= triggerPx) {
+                            onRefresh()
+                        }
+                        armed = false
+                        rawOffset = 0f
+                    },
+                    onDragCancel = {
+                        isDragging = false
+                        armed = false
+                        rawOffset = 0f
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        if (armed) {
+                            val next = (rawOffset + dragAmount * 0.5f)
+                                .coerceIn(0f, maxPullPx)
+                            if (next > 0f || rawOffset > 0f) {
+                                change.consume()
+                            }
+                            rawOffset = next
+                        }
+                    }
+                )
+            }
+    ) {
+
+        if (animatedOffset > 1f) {
+
+            val progress = (animatedOffset / triggerPx).coerceIn(0f, 1f)
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp)
+                    .offset { IntOffset(0, (animatedOffset * 0.4f).roundToInt()) },
+                contentAlignment = Alignment.Center
+            ) {
+
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF2563EB),
+                    shadowElevation = 3.dp
+                ) {
+                    Box(
+                        modifier = Modifier.size(30.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "↻",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.rotate(progress * 360f)
+                        )
+                    }
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .offset { IntOffset(0, animatedOffset.roundToInt()) }
+        ) {
+            content()
         }
     }
 }
