@@ -7,6 +7,7 @@ import com.example.tippscores.data.model.MatchEvent
 import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.data.model.MatchHighlight
 import com.example.tippscores.data.model.MatchStatistic
+import com.example.tippscores.data.model.PlayerProfile
 import com.example.tippscores.data.remote.NetworkModule
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
@@ -107,6 +108,58 @@ class MatchDetailsRepository(
             headToHead = h?.headToHead.orEmpty(),
             highlight = h?.highlight
         )
+    }
+
+    /**
+     * A StatPal "Get Player" végpontja (v2/soccer/players/{player_id}) - kor,
+     * nemzetiség, poszt, testmagasság/súly, piaci érték és szezon-statisztikák.
+     * A meglévő általános URL-alapú StatPal klienst használja, nincs szükség
+     * új Retrofit végpontra.
+     */
+    suspend fun fetchPlayerProfile(playerId: String): PlayerProfile? {
+        val key = statpalKeyProvider().trim()
+        if (key.isEmpty() || playerId.isBlank()) return null
+
+        return try {
+            val root = NetworkModule.statpalMatchDetailsApi.getDetails(
+                url = "https://statpal.io/api/v2/soccer/players/$playerId",
+                accessKey = key
+            )
+
+            val playerObj = root.getAsJsonObject("player") ?: return null
+
+            val overall = playerObj.getAsJsonObject("overall_club_statistics")
+            val leagueStats = playerObj.getAsJsonObject("club_league_statistics")
+                ?.getAsJsonArray("club")
+                ?.firstOrNull { it.isJsonObject }
+                ?.asJsonObject
+
+            fun stat(vararg keys: String): String? =
+                overall?.let { firstString(it, *keys) } ?: leagueStats?.let { firstString(it, *keys) }
+
+            PlayerProfile(
+                id = firstString(playerObj, "id") ?: playerId,
+                name = firstString(playerObj, "name") ?: "Ismeretlen játékos",
+                age = firstString(playerObj, "age"),
+                nationality = firstString(playerObj, "nationality"),
+                position = firstString(playerObj, "position"),
+                height = firstString(playerObj, "height"),
+                weight = firstString(playerObj, "weight"),
+                preferredFoot = firstString(playerObj, "preferred_foot"),
+                team = firstString(playerObj, "team"),
+                marketValueEur = firstString(playerObj, "market_value_eur"),
+                appearances = stat("appearances"),
+                goals = stat("goals"),
+                assists = stat("assists"),
+                minutesPlayed = stat("minutes_played"),
+                rating = stat("rating"),
+                yellowCards = stat("yellowcards"),
+                redCards = stat("redcards")
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     private data class HighlightlyMatchDetails(
@@ -409,6 +462,7 @@ class MatchDetailsRepository(
         val source = playerObj ?: obj
         val name = firstString(source, "name", "fullName", "full_name", "player", "playerName") ?: return null
         return LineupPlayer(
+            id = firstString(source, "id", "player_id", "playerId") ?: firstString(obj, "id", "player_id", "playerId"),
             number = firstString(obj, "shirtNumber", "number", "shirt_number", "jersey"),
             name = name,
             position = firstString(obj, "position", "pos", "role") ?: firstString(source, "position"),
@@ -642,6 +696,7 @@ private object MatchDetailsParser {
         val obj = element.asJsonObject
         val name = firstString(obj, "name", "player", "player_name", "playerName", "full_name", "fullname") ?: return null
         return LineupPlayer(
+            id = firstString(obj, "id", "player_id", "playerId"),
             number = firstString(obj, "number", "shirt_number", "shirtNumber", "jersey"),
             name = name,
             position = firstString(obj, "position", "pos", "role"),
