@@ -1,5 +1,8 @@
 package com.example.tippscores.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -170,9 +175,14 @@ fun LeagueHeader(
                     .clickable(onClick = onToggleFeatured)
         )
 
+        val chevronRotation by animateFloatAsState(
+            targetValue = if (isCollapsed) -90f else 0f,
+            animationSpec = tween(220, easing = FastOutSlowInEasing),
+            label = "chevronRotation"
+        )
+
         Text(
-            text =
-                if (isCollapsed) "▸" else "▾",
+            text = "▾",
 
             color =
                 if (isFeatured) Color(0xFFDCEBFF) else colors.tertiaryText,
@@ -183,7 +193,9 @@ fun LeagueHeader(
                 FontWeight.Bold,
 
             modifier =
-                Modifier.padding(start = 4.dp)
+                Modifier
+                    .padding(start = 4.dp)
+                    .rotate(chevronRotation)
         )
     }
 }

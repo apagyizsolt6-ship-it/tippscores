@@ -1,10 +1,13 @@
 package com.example.tippscores.ui.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,8 +31,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.tippscores.data.model.Match
 import com.example.tippscores.ui.theme.LocalAppColors
+import kotlinx.coroutines.launch
 
 @Composable
 fun MatchRow(
@@ -114,12 +121,32 @@ fun MatchRow(
                         Alignment.CenterHorizontally
                 ) {
 
+                    val starScale = remember { Animatable(1f) }
+                    val bounceScope = rememberCoroutineScope()
+
                     Box(
                         modifier =
                             Modifier
                                 .size(32.dp)
                                 .clickable {
                                     onToggleFavorite(match.id)
+                                    bounceScope.launch {
+                                        starScale.snapTo(1f)
+                                        starScale.animateTo(
+                                            1.4f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessHigh
+                                            )
+                                        )
+                                        starScale.animateTo(
+                                            1f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        )
+                                    }
                                 },
 
                         contentAlignment =
@@ -143,7 +170,9 @@ fun MatchRow(
                                     colors.tertiaryText,
 
                             modifier =
-                                Modifier.size(18.dp)
+                                Modifier
+                                    .size(18.dp)
+                                    .scale(starScale.value)
                         )
                     }
 
