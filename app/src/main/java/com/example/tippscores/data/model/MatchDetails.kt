@@ -50,6 +50,7 @@ data class MatchLineup(
 )
 
 data class LineupPlayer(
+    val id: String? = null,
     val number: String? = null,
     val name: String,
     val position: String? = null,
@@ -57,6 +58,26 @@ data class LineupPlayer(
     val isCaptain: Boolean = false
 )
 
+/** A StatPal "Get Player" végpontból (v2/soccer/players/{id}) összeállított, kurált adatlap. */
+data class PlayerProfile(
+    val id: String,
+    val name: String,
+    val age: String? = null,
+    val nationality: String? = null,
+    val position: String? = null,
+    val height: String? = null,
+    val weight: String? = null,
+    val preferredFoot: String? = null,
+    val team: String? = null,
+    val marketValueEur: String? = null,
+    val appearances: String? = null,
+    val goals: String? = null,
+    val assists: String? = null,
+    val minutesPlayed: String? = null,
+    val rating: String? = null,
+    val yellowCards: String? = null,
+    val redCards: String? = null
+)
 
 data class MatchHighlight(
     val id: String = "",
