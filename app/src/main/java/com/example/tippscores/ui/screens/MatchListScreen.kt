@@ -106,7 +106,6 @@ fun MatchListScreen(
     errorMessage: String?,
     isLoading: Boolean,
     statpalKey: String,
-    highlightlyKey: String,
     selectedOffset: Int,
     featuredAdditions: Set<String>,
     featuredRemovals: Set<String>,
@@ -114,7 +113,7 @@ fun MatchListScreen(
     goalNotificationsEnabled: Boolean,
     onRefresh: () -> Unit,
     onDateSelected: (Int) -> Unit,
-    onSaveKeys: (String, String) -> Unit,
+    onSaveKeys: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onToggleFollowTeam: (String) -> Unit,
     onToggleFeaturedLeague: (String, Boolean, Boolean) -> Unit,
@@ -161,8 +160,6 @@ fun MatchListScreen(
             initialStatpalKey =
                 statpalKey,
 
-            initialHighlightlyKey =
-                highlightlyKey,
 
             darkModeEnabled =
                 darkMode,
@@ -180,11 +177,10 @@ fun MatchListScreen(
             onGoalNotificationsChange =
                 onGoalNotificationsChange,
 
-            onSave = { sKey, hKey ->
+            onSave = { sKey ->
 
                 onSaveKeys(
-                    sKey,
-                    hKey
+                    sKey
                 )
 
                 showSettingsDialog = false
