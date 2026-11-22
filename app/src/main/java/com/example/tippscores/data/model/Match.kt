@@ -29,7 +29,7 @@ data class Match(
     val tipPrediction: String?, // pl. "TÚL 2.5 GÓL"
     val tipConfidence: Int?,    // pl. 85
 
-    // Highlightly API adatok
+    // Videó highlight (jelenleg nem használt)
     val hasVideoHighlight: Boolean = false,
     val videoUrl: String? = null,
 
