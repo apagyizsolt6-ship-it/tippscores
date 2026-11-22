@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SettingsDialog(
     initialStatpalKey: String,
-    initialHighlightlyKey: String,
     darkModeEnabled: Boolean,
     goalNotificationsEnabled: Boolean,
     onDismiss: () -> Unit,
@@ -34,7 +33,6 @@ fun SettingsDialog(
     onGoalNotificationsChange: (Boolean) -> Unit,
     onSave: (
         statpalKey: String,
-        highlightlyKey: String
     ) -> Unit
 ) {
 
@@ -42,13 +40,6 @@ fun SettingsDialog(
         remember(initialStatpalKey) {
             mutableStateOf(
                 initialStatpalKey
-            )
-        }
-
-    var highlightlyKey by
-        remember(initialHighlightlyKey) {
-            mutableStateOf(
-                initialHighlightlyKey
             )
         }
 
@@ -154,7 +145,7 @@ fun SettingsDialog(
 
                 Text(
                     text =
-                        "Az alkalmazás a mérkőzésekhez a StatPal, a videókhoz pedig a Highlightly szolgáltatást használja.",
+                        "Az alkalmazás a StatPal API-t használja a mérkőzésekhez.",
 
                     fontSize = 12.sp
                 )
@@ -191,37 +182,6 @@ fun SettingsDialog(
                         Modifier.fillMaxWidth()
                 )
 
-                Spacer(
-                    modifier =
-                        Modifier.height(10.dp)
-                )
-
-                OutlinedTextField(
-
-                    value =
-                        highlightlyKey,
-
-                    onValueChange = {
-                        highlightlyKey = it
-                    },
-
-                    label = {
-                        Text(
-                            "Highlightly API-kulcs"
-                        )
-                    },
-
-                    placeholder = {
-                        Text(
-                            "Írd be a Highlightly kulcsot"
-                        )
-                    },
-
-                    singleLine = true,
-
-                    modifier =
-                        Modifier.fillMaxWidth()
-                )
             }
         },
 
@@ -231,8 +191,7 @@ fun SettingsDialog(
                 onClick = {
 
                     onSave(
-                        statpalKey.trim(),
-                        highlightlyKey.trim()
+                        statpalKey.trim()
                     )
                 }
             ) {
