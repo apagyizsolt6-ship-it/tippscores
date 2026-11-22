@@ -57,13 +57,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private val teamProfileRepository by lazy {
-        TeamProfileRepository { apiPreferences.highlightlyApiKey }
+        TeamProfileRepository()
     }
 
     private val detailsRepository by lazy {
         com.example.tippscores.data.repository.MatchDetailsRepository(
             statpalKeyProvider = { apiPreferences.statpalApiKey },
-            highlightlyKeyProvider = { apiPreferences.highlightlyApiKey }
         )
     }
 
@@ -163,8 +162,6 @@ class MainActivity : ComponentActivity() {
             val statpalKey by
                 viewModel.statpalKey.collectAsState()
 
-            val highlightlyKey by
-                viewModel.highlightlyKey.collectAsState()
 
             val selectedOffset by
                 viewModel.selectedOffset.collectAsState()
@@ -304,7 +301,6 @@ class MainActivity : ComponentActivity() {
 
                             statpalKey = statpalKey,
 
-                            highlightlyKey = highlightlyKey,
 
                             selectedOffset = selectedOffset,
 
@@ -324,7 +320,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel.selectOffset(offset)
                             },
 
-                            onSaveKeys = { sKey, hKey ->
+                            onSaveKeys = { sKey ->
 
                                 viewModel.saveKeysAndRefresh(
                                     sKey,
