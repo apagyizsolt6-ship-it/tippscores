@@ -15,10 +15,6 @@ class ApiPreferences(context: Context) {
         get() = prefs.getString("statpal_key", "") ?: ""
         set(value) = prefs.edit().putString("statpal_key", value).apply()
 
-    var highlightlyApiKey: String
-        get() = prefs.getString("highlightly_key", "") ?: ""
-        set(value) = prefs.edit().putString("highlightly_key", value).apply()
-
     // ========================================================
     // KEDVENC MECCSEK (a csillag a mérkőzéssoron)
     //
