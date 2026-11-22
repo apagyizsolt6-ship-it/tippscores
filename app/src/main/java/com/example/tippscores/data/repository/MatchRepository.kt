@@ -67,19 +67,7 @@ class MatchRepository(
                 )
 
             // ------------------------------------------------
-            // 2. Highlightly csapatlogók
-            //
-            // A logók csak akkor kerülnek lekérésre, ha van
-            // Highlightly API-kulcs.
-            // ------------------------------------------------
-
-            val logoMap =
-                fetchHighlightlyTeamLogos(
-                    offsetDays = safeOffset
-                )
-
-            // ------------------------------------------------
-            // 3. StatPal + Highlightly összekapcsolása
+            // StatPal mérkőzések (csak Statpal logók)
             // ------------------------------------------------
 
             val entities =
@@ -88,7 +76,7 @@ class MatchRepository(
                     offsetDays = safeOffset,
                     forceLive = false,
                     previousById = previousById,
-                    teamLogos = logoMap
+                    teamLogos = emptyMap()
                 )
 
             val sortedEntities =
@@ -207,17 +195,6 @@ class MatchRepository(
                     statpalKey
                 )
 
-            // ------------------------------------------------
-            // Highlightly logók
-            //
-            // Élő meccseknél a mai nap logóit kérjük le.
-            // ------------------------------------------------
-
-            val logoMap =
-                fetchHighlightlyTeamLogos(
-                    offsetDays = 0
-                )
-
             val entities =
                 buildEntities(
                     leagues = response.data?.leagues.orEmpty(),
@@ -273,138 +250,6 @@ class MatchRepository(
 
             throw e
         }
-    }
-
-    // ========================================================
-    // HIGHLIGHTLY LOGÓK BETÖLTÉSE
-    // ========================================================
-    //
-    // A Highlightly /matches végpontja dátum szerint adja vissza
-    // a meccseket.
-    //
-    // Egy oldal maximum 100 meccs lehet, ezért több oldalt is
-    // lekérünk, amíg elfogynak a mérkőzések.
-    //
-    // A kulcs a normalizált csapatnév.
-    //
-    // Példa:
-    //
-    // "QPR"
-    // "Queens Park Rangers"
-    //
-    // -> normalizált név alapján próbáljuk összekapcsolni.
-    //
-    // ========================================================
-
-    private suspend fun fetchHighlightlyTeamLogos(
-        offsetDays: Int
-    ): Map<String, String> {
-
-        val highlightlyKey =
-            apiPreferences.highlightlyApiKey.trim()
-
-        if (highlightlyKey.isEmpty()) {
-            return emptyMap()
-        }
-
-        val date =
-            dateForOffset(offsetDays)
-
-        val result =
-            mutableMapOf<String, String>()
-
-        try {
-
-            var offset = 0
-
-            val pageSize = 100
-
-            // Biztonsági korlát:
-            // maximum 10 oldal / 1000 meccs.
-            //
-            // Egy napra ez bőven elegendő, és megakadályozza,
-            // hogy hibás pagination esetén végtelen ciklus legyen.
-            var pageCount = 0
-
-            while (pageCount < 10) {
-
-                val response =
-                    NetworkModule.highlightlyApi.getMatches(
-                        apiKey = highlightlyKey,
-                        date = date,
-                        timezone = "Europe/Budapest",
-                        limit = pageSize,
-                        offset = offset
-                    )
-
-                val matches =
-                    response.data.orEmpty()
-
-                if (matches.isEmpty()) {
-                    break
-                }
-
-                for (highlightMatch in matches) {
-
-                    val home =
-                        highlightMatch.homeTeam
-
-                    val away =
-                        highlightMatch.awayTeam
-
-                    val homeName =
-                        home?.name?.trim().orEmpty()
-
-                    val homeLogo =
-                        home?.logo?.trim().orEmpty()
-
-                    val awayName =
-                        away?.name?.trim().orEmpty()
-
-                    val awayLogo =
-                        away?.logo?.trim().orEmpty()
-
-                    if (
-                        homeName.isNotEmpty() &&
-                        homeLogo.isNotEmpty()
-                    ) {
-
-                        result[
-                            normalizeTeamName(homeName)
-                        ] = homeLogo
-                    }
-
-                    if (
-                        awayName.isNotEmpty() &&
-                        awayLogo.isNotEmpty()
-                    ) {
-
-                        result[
-                            normalizeTeamName(awayName)
-                        ] = awayLogo
-                    }
-                }
-
-                // Ha kevesebb érkezett, mint a maximális
-                // oldalméret, nincs több oldal.
-                if (matches.size < pageSize) {
-                    break
-                }
-
-                offset += pageSize
-                pageCount++
-            }
-
-        } catch (e: Exception) {
-
-            // A logó ne állítsa meg a teljes meccslistát.
-            //
-            // Ha a Highlightly hibázik, a StatPal meccsek
-            // továbbra is megjelennek.
-            e.printStackTrace()
-        }
-
-        return result
     }
 
     // ========================================================
@@ -667,13 +512,7 @@ class MatchRepository(
                         previous.awayScore
 
                 // ------------------------------------------------
-                // LOGÓ
-                //
-                // Elsőként a StatPal saját logóját használjuk,
-                // ha van.
-                //
-                // Ha nincs:
-                // Highlightly alapján keressük.
+                // LOGÓ – csak StatPal saját logója
                 // ------------------------------------------------
 
                 val homeLogo =
