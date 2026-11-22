@@ -155,14 +155,6 @@ class MatchViewModel(
     val statpalKey: StateFlow<String> =
         _statpalKey
 
-    private val _highlightlyKey =
-        MutableStateFlow(
-            apiPreferences.highlightlyApiKey
-        )
-
-    val highlightlyKey: StateFlow<String> =
-        _highlightlyKey
-
     // ========================================================
     // KIVÁLASZTOTT NAP
     // ========================================================
@@ -349,27 +341,17 @@ class MatchViewModel(
     // ========================================================
 
     fun saveKeysAndRefresh(
-        statpalKey: String,
-        highlightlyKey: String
+        statpalKey: String
     ) {
 
         val cleanStatpalKey =
             statpalKey.trim()
 
-        val cleanHighlightlyKey =
-            highlightlyKey.trim()
-
         apiPreferences.statpalApiKey =
             cleanStatpalKey
 
-        apiPreferences.highlightlyApiKey =
-            cleanHighlightlyKey
-
         _statpalKey.value =
             cleanStatpalKey
-
-        _highlightlyKey.value =
-            cleanHighlightlyKey
 
         refreshData()
     }
