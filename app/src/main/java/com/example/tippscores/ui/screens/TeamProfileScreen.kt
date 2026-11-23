@@ -57,7 +57,8 @@ fun TeamProfileScreen(
     teamName: String,
     fallbackLogoUrl: String,
     repository: TeamProfileRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCoachClick: (String, String) -> Unit = { _, _ -> }
 ) {
     val colors = LocalAppColors.current
     var profile by remember(teamId, teamName) { mutableStateOf<TeamProfile?>(null) }
@@ -177,7 +178,7 @@ fun TeamProfileScreen(
             } else {
                 val p = profile
                 if (p != null) {
-                    profileSections(p, leagueStats, colors)
+                    profileSections(p, leagueStats, colors, onCoachClick)
                 }
             }
         }
@@ -187,7 +188,8 @@ fun TeamProfileScreen(
 private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
     p: TeamProfile,
     leagueStats: LeagueStats?,
-    colors: AppColorScheme
+    colors: AppColorScheme,
+    onCoachClick: (String, String) -> Unit
 ) {
     // --- Stadion + edző ---
     val hasVenue = !p.venueName.isNullOrBlank() || !p.coachName.isNullOrBlank()
@@ -198,7 +200,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
                 InfoRow("Város", p.venueCity, colors)
                 InfoRow("Befogadóképesség", p.venueCapacity?.let { formatNumber(it) }, colors)
                 InfoRow("Pálya", p.venueSurface, colors)
-                InfoRow("Edző", p.coachName, colors)
+                InfoRow(
+                    label = "Edző",
+                    value = p.coachName?.let { if (p.coachId != null) "$it ›" else it },
+                    colors = colors,
+                    onClick = if (p.coachId != null && p.coachName != null) {
+                        { onCoachClick(p.coachId, p.coachName) }
+                    } else {
+                        null
+                    }
+                )
             }
         }
     }
@@ -686,18 +697,24 @@ private fun SquadRow(player: TeamSquadPlayer, colors: AppColorScheme) {
 }
 
 @Composable
-private fun InfoRow(label: String, value: String?, colors: AppColorScheme) {
+private fun InfoRow(
+    label: String,
+    value: String?,
+    colors: AppColorScheme,
+    onClick: (() -> Unit)? = null
+) {
     if (value.isNullOrBlank()) return
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 5.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(label, color = colors.secondaryText, fontSize = 12.sp)
         Text(
             value,
-            color = colors.primaryText,
+            color = if (onClick != null) Color(0xFF2563EB) else colors.primaryText,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
             textAlign = TextAlign.End,
