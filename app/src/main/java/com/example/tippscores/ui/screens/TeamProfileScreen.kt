@@ -37,6 +37,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.tippscores.data.model.LeaguePlayerStat
+import com.example.tippscores.data.model.LeagueStats
 import com.example.tippscores.data.model.TeamLeagueRecord
 import com.example.tippscores.data.model.TeamMinuteBucket
 import com.example.tippscores.data.model.TeamProfile
@@ -61,6 +63,22 @@ fun TeamProfileScreen(
     var profile by remember(teamId, teamName) { mutableStateOf<TeamProfile?>(null) }
     var loading by remember(teamId, teamName) { mutableStateOf(true) }
     var error by remember(teamId, teamName) { mutableStateOf<String?>(null) }
+
+    var leagueStats by remember(teamId, teamName) { mutableStateOf<LeagueStats?>(null) }
+    val leagueId = profile?.leagueRecords?.firstOrNull()?.leagueId
+
+    // A bajnoki játékos-statisztikák külön, a profil betöltése után érkeznek.
+    LaunchedEffect(leagueId) {
+        leagueStats = if (leagueId.isNullOrBlank()) {
+            null
+        } else {
+            try {
+                repository.fetchLeagueStats(leagueId)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 
     LaunchedEffect(teamId, teamName) {
         loading = true
@@ -159,7 +177,7 @@ fun TeamProfileScreen(
             } else {
                 val p = profile
                 if (p != null) {
-                    profileSections(p, colors)
+                    profileSections(p, leagueStats, colors)
                 }
             }
         }
@@ -168,6 +186,7 @@ fun TeamProfileScreen(
 
 private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
     p: TeamProfile,
+    leagueStats: LeagueStats?,
     colors: AppColorScheme
 ) {
     // --- Stadion + edző ---
@@ -315,6 +334,84 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
         }
     }
 
+    // --- Játékosok szezonstatisztikája + bajnoki listák ---
+    if (leagueStats != null) {
+        val ordering = compareByDescending<LeaguePlayerStat> { it.goals }
+            .thenByDescending { it.assists }
+            .thenByDescending { it.minutes }
+
+        val own = leagueStats.players
+            .filter { it.teamId == p.id && (it.appearances > 0 || it.minutes > 0) }
+            .sortedWith(ordering)
+            .take(20)
+
+        if (own.isNotEmpty()) {
+            item {
+                SectionCard(title = "Játékosok – ${leagueStats.leagueName}", colors = colors) {
+                    own.forEach { player ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    player.name,
+                                    color = colors.primaryText,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    "${player.appearances} mérk. • ${player.minutes} perc",
+                                    color = colors.tertiaryText,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Text(
+                                "${player.goals} gól • ${player.assists} assz." +
+                                    (player.rating?.let { " • ⌀ %.1f".format(it) } ?: ""),
+                                color = colors.primaryText,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        val topScorers = leagueStats.players
+            .filter { it.goals > 0 }
+            .sortedWith(ordering)
+            .take(5)
+
+        if (topScorers.isNotEmpty()) {
+            item {
+                SectionCard(title = "Gólkirály-lista – ${leagueStats.leagueName}", colors = colors) {
+                    TopPlayerRows(topScorers, { it.goals }, p.id, colors)
+                }
+            }
+        }
+
+        val topAssists = leagueStats.players
+            .filter { it.assists > 0 }
+            .sortedWith(
+                compareByDescending<LeaguePlayerStat> { it.assists }
+                    .thenByDescending { it.goals }
+                    .thenBy { it.minutes }
+            )
+            .take(5)
+
+        if (topAssists.isNotEmpty()) {
+            item {
+                SectionCard(title = "Gólpassz-lista – ${leagueStats.leagueName}", colors = colors) {
+                    TopPlayerRows(topAssists, { it.assists }, p.id, colors)
+                }
+            }
+        }
+    }
+
     // --- Keret ---
     if (p.squad.isNotEmpty()) {
         item {
@@ -402,6 +499,47 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TopPlayerRows(
+    players: List<LeaguePlayerStat>,
+    value: (LeaguePlayerStat) -> Int,
+    ownTeamId: String,
+    colors: AppColorScheme
+) {
+    players.forEachIndexed { index, player ->
+        val isOwn = player.teamId == ownTeamId
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${index + 1}.",
+                modifier = Modifier.width(26.dp),
+                color = colors.tertiaryText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    player.name,
+                    color = if (isOwn) WinColor else colors.primaryText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+                Text(player.teamName, color = colors.tertiaryText, fontSize = 10.sp)
+            }
+            Text(
+                value(player).toString(),
+                color = colors.primaryText,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 14.sp
+            )
         }
     }
 }
