@@ -9,6 +9,10 @@ import com.example.tippscores.data.repository.MatchRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -94,6 +98,15 @@ class MatchViewModel(
 
     val goalNotificationsEnabled: StateFlow<Boolean> =
         _goalNotificationsEnabled
+    private val _lastUpdated = MutableStateFlow<String?>(null)
+    val lastUpdated: StateFlow<String?> = _lastUpdated.asStateFlow()
+
+    private fun updateLastUpdated() {
+        val sdf = SimpleDateFormat("HH:mm", Locale("hu", "HU"))
+        _lastUpdated.value = "Frissítve: ${sdf.format(Date())}"
+    }
+
+
 
     fun setGoalNotificationsEnabled(enabled: Boolean) {
         apiPreferences.goalNotificationsEnabled = enabled
@@ -302,6 +315,7 @@ class MatchViewModel(
             } finally {
 
                 _isLoading.value = false
+                updateLastUpdated()
             }
         }
     }
@@ -332,6 +346,7 @@ class MatchViewModel(
             } finally {
 
                 _isLoading.value = false
+                updateLastUpdated()
             }
         }
     }
