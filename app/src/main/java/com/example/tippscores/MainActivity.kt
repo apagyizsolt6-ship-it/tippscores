@@ -162,6 +162,9 @@ class MainActivity : ComponentActivity() {
             val statpalKey by
                 viewModel.statpalKey.collectAsState()
 
+            val lastUpdated by
+                viewModel.lastUpdated.collectAsState()
+
 
             val selectedOffset by
                 viewModel.selectedOffset.collectAsState()
@@ -350,6 +353,8 @@ class MainActivity : ComponentActivity() {
                                     requestNotificationPermissionIfNeeded()
                                 }
                             },
+
+                            lastUpdated = lastUpdated,
 
                             onMatchClick = { matchId ->
                                 selectedMatchId = matchId
