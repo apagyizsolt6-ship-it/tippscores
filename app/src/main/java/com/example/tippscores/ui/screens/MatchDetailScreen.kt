@@ -324,7 +324,7 @@ fun MatchDetailScreen(
                             EventRow(event)
                         }
                         if (details?.events.isNullOrEmpty()) {
-                            item { EmptyDetailsCard(if (match.isLive || match.homeScore != null) "Még nincsenek események (gól, lap, csere)." else "Az események a mérkőzés kezdete után jelennek meg.") }
+                            item { EmptyDetailsCard("Még nincsenek események (gól, lap, csere).") }
                         }
                     }
 
@@ -351,7 +351,7 @@ fun MatchDetailScreen(
                         }
                         if (details?.hasLineups != true) {
                             item {
-                                EmptyDetailsCard(if (match.isLive || match.homeScore != null) "A kezdőcsapat és a cserepad jelenleg nem érhető el." else "A kezdőcsapat általában a mérkőzés előtt 1 órával válik elérhetővé.")
+                                EmptyDetailsCard("A kezdőcsapat és a cserepad jelenleg nem érhető el.")
                             }
                         }
                     }
@@ -550,7 +550,7 @@ private fun StatisticsSection(
     val stats = details?.statistics.orEmpty()
 
     if (stats.isEmpty()) {
-        EmptyDetailsCard(if (match.isLive || match.homeScore != null) "A részletes statisztika ehhez a mérkőzéshez jelenleg nem érhető el." else "A mérkőzés még nem kezdődött el – a statisztikák a kezdés után jelennek meg.")
+        EmptyDetailsCard("A részletes statisztika ehhez a mérkőzéshez jelenleg nem érhető el.")
         return
     }
 
