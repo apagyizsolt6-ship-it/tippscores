@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tippscores.data.remote.NetworkModule
 
 @Composable
 fun SettingsDialog(
@@ -41,11 +42,21 @@ fun SettingsDialog(
     var usageLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        // API usage lekérdezése (nem számít a kvótába)
         usageLoading = true
         try {
-            // Itt később lehet valódi hívás, most placeholder
-            apiUsage = "API használat: ellenőrizd a StatPal fiókodban"
+            val key = initialStatpalKey.trim()
+            if (key.isNotEmpty()) {
+                val root = NetworkModule.statpalMatchDetailsApi.getDetails(
+                    url = "https://statpal.io/api/user-request-count",
+                    accessKey = key
+                )
+                val count = root.get("request_count")?.asString
+                    ?: root.get("current_date")?.asString
+                    ?: "?"
+                apiUsage = "Mai API hívások: $count"
+            } else {
+                apiUsage = "API kulcs szükséges a használat ellenőrzéséhez"
+            }
         } catch (_: Exception) {
             apiUsage = "API használat nem elérhető"
         }
