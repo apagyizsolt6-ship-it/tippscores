@@ -11,8 +11,10 @@ data class Match(
     val presetOrder: Int = -1,
 
     val homeTeam: String,
+    val homeTeamId: String? = null,
     val homeTeamLogo: String,
     val awayTeam: String,
+    val awayTeamId: String? = null,
     val awayTeamLogo: String,
     val homeScore: Int?,
     val awayScore: Int?,
