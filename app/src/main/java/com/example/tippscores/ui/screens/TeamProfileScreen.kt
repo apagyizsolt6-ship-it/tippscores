@@ -5,17 +5,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -36,27 +37,36 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.tippscores.data.model.TeamLeagueRecord
+import com.example.tippscores.data.model.TeamMinuteBucket
 import com.example.tippscores.data.model.TeamProfile
+import com.example.tippscores.data.model.TeamSquadPlayer
 import com.example.tippscores.data.repository.TeamProfileRepository
+import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
+
+private val WinColor = Color(0xFF16A34A)
+private val DrawColor = Color(0xFFD97706)
+private val LossColor = Color(0xFFDC2626)
 
 @Composable
 fun TeamProfileScreen(
+    teamId: String?,
     teamName: String,
     fallbackLogoUrl: String,
     repository: TeamProfileRepository,
     onBack: () -> Unit
 ) {
     val colors = LocalAppColors.current
-    var profile by remember(teamName) { mutableStateOf<TeamProfile?>(null) }
-    var loading by remember(teamName) { mutableStateOf(true) }
-    var error by remember(teamName) { mutableStateOf<String?>(null) }
+    var profile by remember(teamId, teamName) { mutableStateOf<TeamProfile?>(null) }
+    var loading by remember(teamId, teamName) { mutableStateOf(true) }
+    var error by remember(teamId, teamName) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(teamName) {
+    LaunchedEffect(teamId, teamName) {
         loading = true
         error = null
         profile = try {
-            repository.fetch(teamName)
+            repository.fetch(teamId, teamName)
         } catch (e: Exception) {
             null
         }
@@ -96,7 +106,7 @@ fun TeamProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp),
+            contentPadding = PaddingValues(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -105,6 +115,7 @@ fun TeamProfileScreen(
                     logoUrl = profile?.logoUrl?.takeIf { it.isNotBlank() } ?: fallbackLogoUrl,
                     country = profile?.country,
                     league = profile?.league,
+                    founded = profile?.founded,
                     colors = colors
                 )
             }
@@ -117,7 +128,9 @@ fun TeamProfileScreen(
                         color = colors.cardBackground
                     ) {
                         Column(
-                            modifier = Modifier.padding(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(30.dp))
@@ -135,119 +148,256 @@ fun TeamProfileScreen(
                     ) {
                         Text(
                             error!!,
-                            modifier = Modifier.padding(20.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
                             color = colors.secondaryText,
                             textAlign = TextAlign.Center
                         )
                     }
                 }
             } else {
-                if (profile?.form.orEmpty().isNotEmpty()) {
-                    item {
-                        SectionCard(title = "Forma – utolsó 5", colors = colors) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                profile!!.form.take(5).forEach { item ->
-                                    Surface(
-                                        modifier = Modifier.size(44.dp),
-                                        shape = CircleShape,
-                                        color = when (item.result) {
-                                            "GY" -> Color(0xFFD1FAE5)
-                                            "V" -> Color(0xFFFEE2E2)
-                                            "D" -> Color(0xFFFEF3C7)
-                                            else -> colors.cardBackground
-                                        }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = item.result,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = Color.Black
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(10.dp))
-                            profile!!.form.take(5).forEach { item ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 5.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(item.label, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        Text(item.opponent, color = colors.tertiaryText, fontSize = 10.sp)
-                                    }
-                                    Text(item.score, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                                }
+                val p = profile
+                if (p != null) {
+                    profileSections(p, colors)
+                }
+            }
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
+    p: TeamProfile,
+    colors: AppColorScheme
+) {
+    // --- Stadion + edző ---
+    val hasVenue = !p.venueName.isNullOrBlank() || !p.coachName.isNullOrBlank()
+    if (hasVenue) {
+        item {
+            SectionCard(title = "Stadion és edző", colors = colors) {
+                InfoRow("Stadion", p.venueName, colors)
+                InfoRow("Város", p.venueCity, colors)
+                InfoRow("Befogadóképesség", p.venueCapacity?.let { formatNumber(it) }, colors)
+                InfoRow("Pálya", p.venueSurface, colors)
+                InfoRow("Edző", p.coachName, colors)
+            }
+        }
+    }
+
+    // --- Szezonmérleg bajnokságonként ---
+    p.leagueRecords.forEach { record ->
+        item {
+            SectionCard(
+                title = "Mérleg – ${record.leagueName}" +
+                    if (record.season.isNotBlank()) " (${record.season})" else "",
+                colors = colors
+            ) {
+                RecordTable(record, colors)
+            }
+        }
+
+        if (record.scoringMinutes.isNotEmpty()) {
+            item {
+                SectionCard(title = "Lőtt gólok időszakonként", colors = colors) {
+                    MinuteBars(record.scoringMinutes, WinColor, colors)
+                }
+            }
+        }
+
+        if (record.concededMinutes.isNotEmpty()) {
+            item {
+                SectionCard(title = "Kapott gólok időszakonként", colors = colors) {
+                    MinuteBars(record.concededMinutes, LossColor, colors)
+                }
+            }
+        }
+    }
+
+    // --- Forma (ha később elérhető) ---
+    if (p.form.isNotEmpty()) {
+        item {
+            SectionCard(title = "Forma – utolsó 5", colors = colors) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    p.form.take(5).forEach { item ->
+                        Surface(
+                            modifier = Modifier.size(44.dp),
+                            shape = CircleShape,
+                            color = resultColor(item.result)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = item.result,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.Black
+                                )
                             }
                         }
                     }
                 }
-
-                if (profile?.statistics.orEmpty().isNotEmpty()) {
-                    item {
-                        SectionCard(title = "Szezonstatisztikák", colors = colors) {
-                            profile!!.statistics.forEach { stat ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(stat.label, color = colors.secondaryText, fontSize = 12.sp)
-                                    Text(stat.value, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-                            }
+                Spacer(Modifier.height(10.dp))
+                p.form.take(5).forEach { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.label, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(item.opponent, color = colors.tertiaryText, fontSize = 10.sp)
                         }
+                        Text(item.score, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                     }
                 }
+            }
+        }
+    }
 
-                item {
-                    SectionCard(title = "Utolsó 5 mérkőzés", colors = colors) {
-                        if (profile?.recentMatches.orEmpty().isEmpty()) {
-                            Text("Nincs elérhető korábbi mérkőzés.", color = colors.secondaryText, fontSize = 12.sp)
-                        } else {
-                            profile!!.recentMatches.forEach { game ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        modifier = Modifier.size(30.dp),
-                                        shape = CircleShape,
-                                        color = when (game.result) {
-                                            "GY" -> Color(0xFFD1FAE5)
-                                            "V" -> Color(0xFFFEE2E2)
-                                            else -> Color(0xFFFEF3C7)
-                                        }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(game.result, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
-                                        }
-                                    }
-                                    Spacer(Modifier.size(8.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(game.opponent, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        Text("${game.homeTeam} – ${game.awayTeam}", color = colors.tertiaryText, fontSize = 9.sp)
-                                    }
-                                    Text(
-                                        "${game.homeScore} – ${game.awayScore}",
-                                        color = colors.primaryText,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 13.sp
-                                    )
-                                }
+    // --- Szezonstatisztikák (ha később elérhető) ---
+    if (p.statistics.isNotEmpty()) {
+        item {
+            SectionCard(title = "Szezonstatisztikák", colors = colors) {
+                p.statistics.forEach { stat ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(stat.label, color = colors.secondaryText, fontSize = 12.sp)
+                        Text(stat.value, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Utolsó mérkőzések (ha később elérhető) ---
+    if (p.recentMatches.isNotEmpty()) {
+        item {
+            SectionCard(title = "Utolsó 5 mérkőzés", colors = colors) {
+                p.recentMatches.forEach { game ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(30.dp),
+                            shape = CircleShape,
+                            color = resultColor(game.result)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(game.result, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
                             }
+                        }
+                        Spacer(Modifier.size(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(game.opponent, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("${game.homeTeam} – ${game.awayTeam}", color = colors.tertiaryText, fontSize = 9.sp)
+                        }
+                        Text(
+                            "${game.homeScore} – ${game.awayScore}",
+                            color = colors.primaryText,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Keret ---
+    if (p.squad.isNotEmpty()) {
+        item {
+            SectionCard(title = "Keret (${p.squad.size} fő)", colors = colors) {
+                val groups = p.squad.groupBy { positionGroup(it.position) }
+                listOf("Kapusok", "Védők", "Középpályások", "Támadók", "Egyéb").forEach { group ->
+                    val players = groups[group].orEmpty()
+                    if (players.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            group,
+                            color = colors.secondaryText,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        players.forEach { player -> SquadRow(player, colors) }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Átigazolások ---
+    if (p.transfers.isNotEmpty()) {
+        item {
+            SectionCard(title = "Átigazolások", colors = colors) {
+                p.transfers.take(12).forEach { t ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            if (t.isIncoming) "▲" else "▼",
+                            color = if (t.isIncoming) WinColor else LossColor,
+                            fontSize = 12.sp,
+                            modifier = Modifier.width(22.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(t.playerName, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            val detail = listOfNotNull(
+                                t.otherTeam?.let { if (t.isIncoming) "innen: $it" else "ide: $it" },
+                                t.type,
+                                t.price
+                            ).joinToString(" • ")
+                            if (detail.isNotBlank()) {
+                                Text(detail, color = colors.tertiaryText, fontSize = 10.sp)
+                            }
+                        }
+                        Text(t.date, color = colors.secondaryText, fontSize = 10.sp)
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Trófeák ---
+    if (p.trophies.isNotEmpty()) {
+        item {
+            SectionCard(title = "Trófeák", colors = colors) {
+                p.trophies.forEach { trophy ->
+                    Column(modifier = Modifier.padding(vertical = 5.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                trophy.league,
+                                color = colors.primaryText,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                listOfNotNull(trophy.status, trophy.count?.let { "×$it" })
+                                    .joinToString(" "),
+                                color = colors.secondaryText,
+                                fontSize = 11.sp
+                            )
+                        }
+                        if (!trophy.seasons.isNullOrBlank()) {
+                            Text(trophy.seasons, color = colors.tertiaryText, fontSize = 10.sp)
                         }
                     }
                 }
@@ -257,12 +407,175 @@ fun TeamProfileScreen(
 }
 
 @Composable
+private fun RecordTable(record: TeamLeagueRecord, colors: AppColorScheme) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text("", modifier = Modifier.weight(1.4f))
+        listOf("Össz.", "Hazai", "Idegen").forEach { title ->
+            Text(
+                title,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                color = colors.secondaryText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+        }
+    }
+
+    RecordRow("Győzelem", record.winsTotal, record.winsHome, record.winsAway, WinColor, colors)
+    RecordRow("Döntetlen", record.drawsTotal, record.drawsHome, record.drawsAway, DrawColor, colors)
+    RecordRow("Vereség", record.lossesTotal, record.lossesHome, record.lossesAway, LossColor, colors)
+
+    Spacer(Modifier.height(6.dp))
+    Text(
+        "Lejátszott mérkőzés: ${record.played}",
+        color = colors.tertiaryText,
+        fontSize = 10.sp
+    )
+}
+
+@Composable
+private fun RecordRow(
+    label: String,
+    total: Int,
+    home: Int,
+    away: Int,
+    accent: Color,
+    colors: AppColorScheme
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            modifier = Modifier.weight(1.4f),
+            color = accent,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
+        )
+        listOf(total, home, away).forEach { value ->
+            Text(
+                value.toString(),
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                color = colors.primaryText,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun MinuteBars(
+    buckets: List<TeamMinuteBucket>,
+    barColor: Color,
+    colors: AppColorScheme
+) {
+    val maxCount = (buckets.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
+    buckets.forEach { bucket ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                bucket.range,
+                modifier = Modifier.width(52.dp),
+                color = colors.secondaryText,
+                fontSize = 11.sp
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(colors.divider)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(bucket.count.toFloat() / maxCount)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(barColor)
+                )
+            }
+            Text(
+                "${bucket.count}",
+                modifier = Modifier.width(30.dp),
+                textAlign = TextAlign.End,
+                color = colors.primaryText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun SquadRow(player: TeamSquadPlayer, colors: AppColorScheme) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            player.number ?: "–",
+            modifier = Modifier.width(28.dp),
+            color = colors.tertiaryText,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp
+        )
+        Text(
+            buildString {
+                append(player.name)
+                if (player.isCaptain) append(" (C)")
+                if (player.injured) append(" 🩹")
+            },
+            modifier = Modifier.weight(1f),
+            color = colors.primaryText,
+            fontSize = 12.sp
+        )
+        if (!player.age.isNullOrBlank()) {
+            Text("${player.age} év", color = colors.secondaryText, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String?, colors: AppColorScheme) {
+    if (value.isNullOrBlank()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = colors.secondaryText, fontSize = 12.sp)
+        Text(
+            value,
+            color = colors.primaryText,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            textAlign = TextAlign.End,
+            modifier = Modifier.padding(start = 12.dp)
+        )
+    }
+}
+
+@Composable
 private fun ProfileHeader(
     name: String,
     logoUrl: String,
     country: String?,
     league: String?,
-    colors: com.example.tippscores.ui.theme.AppColorScheme
+    founded: String?,
+    colors: AppColorScheme
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -270,14 +583,18 @@ private fun ProfileHeader(
         color = colors.cardBackground
     ) {
         Column(
-            modifier = Modifier.padding(22.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (logoUrl.isNotBlank()) {
                 AsyncImage(
                     model = logoUrl,
                     contentDescription = "$name logó",
-                    modifier = Modifier.size(82.dp).clip(CircleShape),
+                    modifier = Modifier
+                        .size(82.dp)
+                        .clip(CircleShape),
                     contentScale = ContentScale.Fit
                 )
             } else {
@@ -285,10 +602,15 @@ private fun ProfileHeader(
             }
             Spacer(Modifier.height(10.dp))
             Text(name, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, textAlign = TextAlign.Center)
-            if (!country.isNullOrBlank() || !league.isNullOrBlank()) {
+            val subtitle = listOfNotNull(
+                country?.takeIf { it.isNotBlank() },
+                league?.takeIf { it.isNotBlank() },
+                founded?.takeIf { it.isNotBlank() }?.let { "alapítva: $it" }
+            ).joinToString(" • ")
+            if (subtitle.isNotBlank()) {
                 Spacer(Modifier.height(5.dp))
                 Text(
-                    listOfNotNull(country, league).joinToString(" • "),
+                    subtitle,
                     color = colors.secondaryText,
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center
@@ -301,7 +623,7 @@ private fun ProfileHeader(
 @Composable
 private fun SectionCard(
     title: String,
-    colors: com.example.tippscores.ui.theme.AppColorScheme,
+    colors: AppColorScheme,
     content: @Composable () -> Unit
 ) {
     Surface(
@@ -315,6 +637,27 @@ private fun SectionCard(
             content()
         }
     }
+}
+
+private fun resultColor(result: String): Color =
+    when (result) {
+        "GY" -> Color(0xFFD1FAE5)
+        "V" -> Color(0xFFFEE2E2)
+        else -> Color(0xFFFEF3C7)
+    }
+
+private fun positionGroup(position: String?): String =
+    when (position?.trim()?.uppercase()) {
+        "G", "GK", "GOALKEEPER" -> "Kapusok"
+        "D", "DEFENDER" -> "Védők"
+        "M", "MIDFIELDER" -> "Középpályások"
+        "F", "A", "FORWARD", "ATTACKER" -> "Támadók"
+        else -> "Egyéb"
+    }
+
+private fun formatNumber(raw: String): String {
+    val n = raw.trim().toLongOrNull() ?: return raw
+    return n.toString().reversed().chunked(3).joinToString(" ").reversed()
 }
 
 private fun Modifier.clickableCompat(onClick: () -> Unit): Modifier =
