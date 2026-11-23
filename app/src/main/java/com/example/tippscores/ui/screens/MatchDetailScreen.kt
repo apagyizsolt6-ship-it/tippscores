@@ -694,10 +694,12 @@ private fun EventRow(event: MatchEvent) {
 
 private fun eventIcon(type: String): String =
     when {
-        type.contains("Gól", true) -> "⚽"
-        type.contains("Sárga", true) -> "🟨"
-        type.contains("Piros", true) -> "🟥"
-        type.contains("Csere", true) -> "🔄"
+        type.contains("Gól", true) || type.contains("goal", true) -> "⚽"
+        type.contains("Sárga", true) || type.contains("yellow", true) -> "🟨"
+        type.contains("Piros", true) || type.contains("red", true) -> "🟥"
+        type.contains("Csere", true) || type.contains("sub", true) || type.contains("substitution", true) -> "🔄"
+        type.contains("Penalty", true) || type.contains("tizenegyes", true) -> "⚽"
+        type.contains("Own", true) || type.contains("öngól", true) -> "⚽"
         else -> "•"
     }
 
