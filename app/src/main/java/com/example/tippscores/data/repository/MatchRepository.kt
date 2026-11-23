@@ -616,6 +616,9 @@ class MatchRepository(
                                 }
                                 ?: "Hazai",
 
+                        homeTeamId =
+                            match.home?.id,
+
                         homeTeamLogo =
                             homeLogo,
 
@@ -627,6 +630,9 @@ class MatchRepository(
                                     it.isEmpty()
                                 }
                                 ?: "Vendég",
+
+                        awayTeamId =
+                            match.away?.id,
 
                         awayTeamLogo =
                             awayLogo,

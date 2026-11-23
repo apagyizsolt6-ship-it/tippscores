@@ -26,7 +26,9 @@ class MatchDetailsRepository(
     suspend fun fetch(
         matchId: String,
         homeTeam: String,
-        awayTeam: String
+        awayTeam: String,
+        homeTeamId: String? = null,
+        awayTeamId: String? = null
     ): MatchDetails = coroutineScope {
         val statpalStats = async { fetchStatpal(matchId, "live-match-stats", "stats") }
         val statpalEvents = async { fetchStatpal(matchId, "live-plays", "plays") }
@@ -40,12 +42,14 @@ class MatchDetailsRepository(
             awayTeam = awayTeam
         )
 
+        val h2h = async { fetchHeadToHead(homeTeamId, awayTeamId) }
+
         MatchDetails(
             statistics = parsed.statistics,
             events = parsed.events,
             homeLineup = parsed.homeLineup,
             awayLineup = parsed.awayLineup,
-            headToHead = emptyList(),
+            headToHead = h2h.await(),
             highlight = null
         )
     }
@@ -120,6 +124,41 @@ class MatchDetailsRepository(
             }
         }
         return null
+    }
+
+    private suspend fun fetchHeadToHead(
+        homeTeamId: String?,
+        awayTeamId: String?
+    ): List<HeadToHeadMatch> {
+        if (homeTeamId.isNullOrBlank() || awayTeamId.isNullOrBlank()) return emptyList()
+        val key = statpalKeyProvider().trim()
+        if (key.isEmpty()) return emptyList()
+
+        return try {
+            val root = NetworkModule.statpalMatchDetailsApi.getDetails(
+                url = "https://statpal.io/api/v2/soccer/head-to-head?team1_id=$homeTeamId&team2_id=$awayTeamId",
+                accessKey = key
+            )
+            val meetings = root.getAsJsonObject("head-to-head")
+                ?.getAsJsonObject("recent_meetings")
+                ?.getAsJsonArray("match")
+                ?: return emptyList()
+
+            meetings.mapNotNull { el ->
+                if (!el.isJsonObject) return@mapNotNull null
+                val obj = el.asJsonObject
+                HeadToHeadMatch(
+                    date = obj.get("date")?.asString.orEmpty(),
+                    homeTeam = obj.get("team1_name")?.asString.orEmpty(),
+                    awayTeam = obj.get("team2_name")?.asString.orEmpty(),
+                    homeScore = obj.get("team1_score")?.asString ?: "-",
+                    awayScore = obj.get("team2_score")?.asString ?: "-"
+                )
+            }.take(10)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
     }
 
     private fun MatchLineup.hasPlayers(): Boolean =
