@@ -6,7 +6,10 @@ data class MatchDetails(
     val homeLineup: MatchLineup = MatchLineup(),
     val awayLineup: MatchLineup = MatchLineup(),
     val headToHead: List<HeadToHeadMatch> = emptyList(),
-    val highlight: MatchHighlight? = null
+    val highlight: MatchHighlight? = null,
+    val prediction: String? = null,
+    val weather: String? = null,
+    val injuries: List<String> = emptyList()
 ) {
     val hasStatistics: Boolean get() = statistics.isNotEmpty()
     val hasEvents: Boolean get() = events.isNotEmpty()
@@ -15,6 +18,9 @@ data class MatchDetails(
             homeLineup.substitutePlayers.isNotEmpty() ||
             awayLineup.startingPlayers.isNotEmpty() ||
             awayLineup.substitutePlayers.isNotEmpty()
+    val hasPrediction: Boolean get() = !prediction.isNullOrBlank()
+    val hasWeather: Boolean get() = !weather.isNullOrBlank()
+    val hasInjuries: Boolean get() = injuries.isNotEmpty()
 }
 
 data class HeadToHeadMatch(
@@ -58,7 +64,11 @@ data class LineupPlayer(
     val isCaptain: Boolean = false
 )
 
-/** A StatPal "Get Player" végpontból (v2/soccer/players/{id}) összeállított, kurált adatlap. */
+data class MatchHighlight(
+    val title: String = "",
+    val url: String = ""
+)
+
 data class PlayerProfile(
     val id: String,
     val name: String,
@@ -77,14 +87,4 @@ data class PlayerProfile(
     val rating: String? = null,
     val yellowCards: String? = null,
     val redCards: String? = null
-)
-
-data class MatchHighlight(
-    val id: String = "",
-    val title: String = "",
-    val url: String? = null,
-    val embedUrl: String? = null,
-    val imageUrl: String? = null,
-    val description: String? = null,
-    val type: String? = null
 )
