@@ -201,7 +201,7 @@ class MatchRepository(
                     offsetDays = 0,
                     forceLive = true,
                     previousById = previousById,
-                    teamLogos = logoMap
+                    teamLogos = emptyMap()
                 )
 
             if (entities.isNotEmpty()) {
