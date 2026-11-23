@@ -13,10 +13,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +36,21 @@ fun SettingsDialog(
         statpalKey: String,
     ) -> Unit
 ) {
+
+    var apiUsage by remember { mutableStateOf<String?>(null) }
+    var usageLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        // API usage lekérdezése (nem számít a kvótába)
+        usageLoading = true
+        try {
+            // Itt később lehet valódi hívás, most placeholder
+            apiUsage = "API használat: ellenőrizd a StatPal fiókodban"
+        } catch (_: Exception) {
+            apiUsage = "API használat nem elérhető"
+        }
+        usageLoading = false
+    }
 
     var statpalKey by
         remember(initialStatpalKey) {
@@ -186,6 +202,17 @@ fun SettingsDialog(
         },
 
         confirmButton = {
+
+            if (apiUsage != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = apiUsage ?: "",
+                    fontSize = 12.sp,
+                    color = androidx.compose.ui.graphics.Color.Gray
+                )
+            }
 
             Button(
                 onClick = {
