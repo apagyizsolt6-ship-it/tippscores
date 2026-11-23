@@ -498,7 +498,8 @@ private object MatchDetailsParser {
         for (array in findArrays(obj, setOf("startxi", "startingxi", "starting_xi", "starters", "starting_players", "starting"))) array.forEach { parsePlayer(it)?.let(starters::add) }
         for (array in findArrays(obj, setOf("substitutes", "subs", "bench", "sub_players"))) array.forEach { parsePlayer(it)?.let(subs::add) }
         return MatchLineup(
-            formation = firstString(obj, "formation", "system", "shape"),
+            formation = firstString(obj, "formation", "team_formation", "system", "shape"),
+            isProjected = firstString(root, "status").equals("projected", ignoreCase = true),
             coach = firstString(obj, "coach", "manager", "coach_name", "manager_name")
                 ?: coachObjectName(obj),
             coachId = coachObjectId(obj),
