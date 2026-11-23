@@ -351,6 +351,31 @@ class MatchRepository(
     // LOGÓ FELKERESÉSE
     // ========================================================
 
+    // ========================================================
+    // NÉPSZERŰ CSAPATOK LOGÓ FALLBACK (ha az API nem ad logót)
+    // ========================================================
+
+    private val popularTeamLogos = mapOf(
+        "manchestercity" to "https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg",
+        "manchesterunited" to "https://upload.wikimedia.org/wikipedia/en/7/7a/Manchester_United_FC_crest.svg",
+        "liverpool" to "https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg",
+        "arsenal" to "https://upload.wikimedia.org/wikipedia/en/5/53/Arsenal_FC.svg",
+        "chelsea" to "https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg",
+        "tottenham" to "https://upload.wikimedia.org/wikipedia/en/b/b4/Tottenham_Hotspur.svg",
+        "real madrid" to "https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg",
+        "realmadrid" to "https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg",
+        "barcelona" to "https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg",
+        "atleticomadrid" to "https://upload.wikimedia.org/wikipedia/en/f/f4/Atletico_Madrid_2017_logo.svg",
+        "bayernmunich" to "https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg",
+        "bayern" to "https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg",
+        "dortmund" to "https://upload.wikimedia.org/wikipedia/commons/6/67/Borussia_Dortmund_logo.svg",
+        "juventus" to "https://upload.wikimedia.org/wikipedia/commons/1/15/Juventus_FC_2017_logo.svg",
+        "inter" to "https://upload.wikimedia.org/wikipedia/commons/0/05/FC_Internazionale_Milano_2021.svg",
+        "milan" to "https://upload.wikimedia.org/wikipedia/commons/d/d0/Logo_of_AC_Milan.svg",
+        "psg" to "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg",
+        "paris" to "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg"
+    )
+
     private fun findTeamLogo(
         teamName: String?,
         teamLogos: Map<String, String>
@@ -402,7 +427,7 @@ class MatchRepository(
 
         return candidate?.value?.takeIf {
             it.isNotBlank()
-        } ?: ""
+        } ?: popularTeamLogos[normalized].orEmpty()
     }
 
     // ========================================================
