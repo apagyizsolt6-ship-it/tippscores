@@ -68,6 +68,7 @@ import com.example.tippscores.data.model.HeadToHeadMatch
 import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.data.model.PlayerProfile
 import com.example.tippscores.data.repository.MatchDetailsRepository
+import com.example.tippscores.ui.components.FullPitchLineupCard
 import com.example.tippscores.ui.theme.LocalAppColors
 import java.util.Locale
 
@@ -336,31 +337,57 @@ fun MatchDetailScreen(
                     }
 
                     2 -> {
-                        item {
-                            LineupSection(
-                                title = match.homeTeam,
-                                lineup = details?.homeLineup ?: MatchLineup(),
-                                onPlayerClick = { player ->
-                                    selectedPlayer = player
-                                    selectedPlayerTeam = match.homeTeam
-                                },
-                                onCoachClick = onCoachClick
-                            )
+                        val homeLineup = details?.homeLineup ?: MatchLineup()
+                        val awayLineup = details?.awayLineup ?: MatchLineup()
+                        val hasStarters =
+                            homeLineup.startingPlayers.isNotEmpty() ||
+                                awayLineup.startingPlayers.isNotEmpty()
+
+                        if (hasStarters) {
+                            // Egy közös pálya: hazai felül, vendég alul.
+                            item {
+                                FullPitchLineupCard(
+                                    homeTeam = match.homeTeam,
+                                    awayTeam = match.awayTeam,
+                                    home = homeLineup,
+                                    away = awayLineup,
+                                    events = details?.events.orEmpty(),
+                                    onPlayerClick = { player, teamName ->
+                                        selectedPlayer = player
+                                        selectedPlayerTeam = teamName
+                                    },
+                                    onCoachClick = onCoachClick
+                                )
+                            }
+                        } else if (details?.hasLineups == true) {
+                            // Csak cserepad érkezett: a régi, listás nézet.
+                            item {
+                                LineupSection(
+                                    title = match.homeTeam,
+                                    lineup = homeLineup,
+                                    onPlayerClick = { player ->
+                                        selectedPlayer = player
+                                        selectedPlayerTeam = match.homeTeam
+                                    },
+                                    onCoachClick = onCoachClick
+                                )
+                            }
+                            item {
+                                LineupSection(
+                                    title = match.awayTeam,
+                                    lineup = awayLineup,
+                                    onPlayerClick = { player ->
+                                        selectedPlayer = player
+                                        selectedPlayerTeam = match.awayTeam
+                                    },
+                                    onCoachClick = onCoachClick
+                                )
+                            }
                         }
-                        item {
-                            LineupSection(
-                                title = match.awayTeam,
-                                lineup = details?.awayLineup ?: MatchLineup(),
-                                onPlayerClick = { player ->
-                                    selectedPlayer = player
-                                    selectedPlayerTeam = match.awayTeam
-                                },
-                                onCoachClick = onCoachClick
-                            )
-                        }
+
                         if (details?.hasLineups != true) {
                             item {
-                                EmptyDetailsCard("A kezdőcsapat és a cserepad jelenleg nem érhető el.")
+                                EmptyDetailsCard("A kezdőcsapat és a cserepad ehhez a mérkőzéshez jelenleg nem érhető el.")
                             }
                         }
                     }
