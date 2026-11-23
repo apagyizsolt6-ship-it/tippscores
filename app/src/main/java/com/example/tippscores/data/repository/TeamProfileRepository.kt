@@ -1,5 +1,7 @@
 package com.example.tippscores.data.repository
 
+import com.example.tippscores.data.model.LeagueStats
+import com.example.tippscores.data.model.LeaguePlayerStat
 import com.example.tippscores.data.model.TeamLeagueRecord
 import com.example.tippscores.data.model.TeamMinuteBucket
 import com.example.tippscores.data.model.TeamProfile
@@ -28,7 +30,13 @@ class TeamProfileRepository(
         val profile: TeamProfile
     )
 
+    private data class LeagueCacheEntry(
+        val savedAt: Long,
+        val stats: LeagueStats
+    )
+
     private val cache = mutableMapOf<String, CacheEntry>()
+    private val leagueCache = mutableMapOf<String, LeagueCacheEntry>()
 
     suspend fun fetch(teamId: String?, teamName: String): TeamProfile? {
         val id = teamId?.trim().orEmpty()
@@ -58,6 +66,84 @@ class TeamProfileRepository(
             e.printStackTrace()
             null
         }
+    }
+
+    /**
+     * StatPal "Get League Stats" (v2/soccer/leagues/{league_id}/stats):
+     * a bajnokság összes csapata és keretük játékos-statisztikái egy
+     * hívásban. 30 percig memóriában tartjuk (nagy válasz).
+     */
+    suspend fun fetchLeagueStats(leagueId: String?): LeagueStats? {
+        val id = leagueId?.trim().orEmpty()
+        val key = statpalKeyProvider().trim()
+        if (id.isEmpty() || key.isEmpty()) return null
+
+        val cached = leagueCache[id]
+        if (cached != null &&
+            System.currentTimeMillis() - cached.savedAt < LEAGUE_CACHE_MS
+        ) {
+            return cached.stats
+        }
+
+        return try {
+            val root = NetworkModule.statpalMatchDetailsApi.getDetails(
+                url = "https://statpal.io/api/v2/soccer/leagues/$id/stats",
+                accessKey = key
+            )
+            val stats = parseLeagueStats(root, id)
+            if (stats != null) {
+                leagueCache[id] = LeagueCacheEntry(System.currentTimeMillis(), stats)
+            }
+            stats
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun parseLeagueStats(root: JsonObject, id: String): LeagueStats? {
+        val league = root.obj("league_stats")
+            ?.get("league")
+            .items()
+            .firstOrNull()
+            ?: return null
+
+        val players = league.get("team")
+            .items()
+            .flatMap { team ->
+                val teamId = team.text("id")
+                val teamName = team.text("name").orEmpty()
+                team.obj("squad")
+                    ?.get("player")
+                    .items()
+                    .mapNotNull { p ->
+                        val name = p.text("name") ?: return@mapNotNull null
+                        LeaguePlayerStat(
+                            playerId = p.text("id"),
+                            name = name,
+                            teamId = teamId,
+                            teamName = teamName,
+                            number = p.text("number"),
+                            position = p.text("position"),
+                            appearances = (p.text("appearences") ?: p.text("appearances"))
+                                ?.toIntOrNull() ?: 0,
+                            minutes = p.text("minutes_played")?.toIntOrNull() ?: 0,
+                            goals = p.text("goals")?.toIntOrNull() ?: 0,
+                            assists = p.text("assists")?.toIntOrNull() ?: 0,
+                            yellowCards = p.text("yellowcards")?.toIntOrNull() ?: 0,
+                            redCards = p.text("redcards")?.toIntOrNull() ?: 0,
+                            rating = p.text("rating")?.toDoubleOrNull()?.takeIf { it > 0.0 }
+                        )
+                    }
+            }
+
+        return LeagueStats(
+            leagueId = league.text("id") ?: id,
+            leagueName = league.text("name") ?: "Bajnokság",
+            players = players
+        )
     }
 
     private fun parse(root: JsonObject, id: String, fallbackName: String): TeamProfile? {
@@ -138,6 +224,7 @@ class TeamProfileRepository(
         return TeamLeagueRecord(
             leagueName = lg.text("name") ?: "Bajnokság",
             season = lg.text("season").orEmpty(),
+            leagueId = lg.text("id").orEmpty(),
             winsTotal = value("win", "total"),
             winsHome = value("win", "home"),
             winsAway = value("win", "away"),
@@ -219,5 +306,6 @@ class TeamProfileRepository(
 
     private companion object {
         const val CACHE_MS = 10 * 60 * 1000L
+        const val LEAGUE_CACHE_MS = 30 * 60 * 1000L
     }
 }

@@ -45,7 +45,6 @@ class MatchDetailsRepository(
         val h2h = async { fetchHeadToHead(homeTeamId, awayTeamId) }
         val prediction = async { fetchPrediction(matchId) }
         val weather = async { fetchWeather(matchId) }
-        val injuries = async { fetchInjuries() }
 
         MatchDetails(
             statistics = parsed.statistics,
@@ -56,7 +55,7 @@ class MatchDetailsRepository(
             highlight = null,
             prediction = prediction.await(),
             weather = weather.await(),
-            injuries = injuries.await()
+            injuries = parsed.injuries
         )
     }
 
@@ -157,21 +156,6 @@ class MatchDetailsRepository(
             val cond = root.getAsJsonObject("weather")?.get("condition")?.asString
             listOfNotNull(temp, cond).joinToString(" • ").ifBlank { null }
         } catch (_: Exception) { null }
-    }
-
-    private suspend fun fetchInjuries(): List<String> {
-        val key = statpalKeyProvider().trim()
-        if (key.isEmpty()) return emptyList()
-        return try {
-            val root = NetworkModule.statpalMatchDetailsApi.getDetails(
-                url = "https://statpal.io/api/v2/soccer/injuries-suspensions",
-                accessKey = key
-            )
-            // Simple extraction - adjust based on actual response structure
-            root.getAsJsonArray("injuries")?.mapNotNull { 
-                it.asJsonObject.get("player")?.asString 
-            }?.take(5) ?: emptyList()
-        } catch (_: Exception) { emptyList() }
     }
 
     private suspend fun fetchHeadToHead(
@@ -338,8 +322,41 @@ private object MatchDetailsParser {
         statistics = parseStatistics(statisticsJson),
         events = parseEvents(eventsJson, homeTeam, awayTeam),
         homeLineup = parseLineup(rostersJson, homeTeam, true),
-        awayLineup = parseLineup(rostersJson, awayTeam, false)
+        awayLineup = parseLineup(rostersJson, awayTeam, false),
+        injuries = parseSidelined(rostersJson, homeTeam, awayTeam)
     )
+
+    /**
+     * A rosters válasz "sidelined" listája: az adott meccs két csapatának
+     * hiányzói (kiesik / kérdéses, ok: sérülés vagy eltiltás).
+     */
+    private fun parseSidelined(root: JsonObject?, homeTeam: String, awayTeam: String): List<String> {
+        if (root == null) return emptyList()
+        val result = mutableListOf<String>()
+        listOf(homeTeam to true, awayTeam to false).forEach { (team, preferHome) ->
+            val obj = findTeamObject(root, team, preferHome) ?: return@forEach
+            for (array in findArrays(obj, setOf("sidelined", "injuries", "missing"))) {
+                array.forEach { element ->
+                    if (!element.isJsonObject) return@forEach
+                    val p = element.asJsonObject
+                    val name = firstString(p, "name", "player", "player_name") ?: return@forEach
+                    val status = when (firstString(p, "status")?.lowercase()) {
+                        "out" -> "kiesik"
+                        "doubtful" -> "kérdéses"
+                        else -> null
+                    }
+                    val reason = when (firstString(p, "reason")?.lowercase()) {
+                        "injury" -> "sérülés"
+                        "suspension", "suspended" -> "eltiltás"
+                        else -> null
+                    }
+                    val details = listOfNotNull(status, reason).joinToString(", ")
+                    result += if (details.isBlank()) "$name ($team)" else "$name ($team) – $details"
+                }
+            }
+        }
+        return result
+    }
 
     private fun parseStatistics(root: JsonObject?): List<MatchStatistic> {
         if (root == null) return emptyList()
@@ -386,10 +403,22 @@ private object MatchDetailsParser {
         for (array in findArrays(obj, setOf("substitutes", "subs", "bench", "sub_players"))) array.forEach { parsePlayer(it)?.let(subs::add) }
         return MatchLineup(
             formation = firstString(obj, "formation", "system", "shape"),
-            coach = firstString(obj, "coach", "manager", "coach_name", "manager_name"),
+            coach = firstString(obj, "coach", "manager", "coach_name", "manager_name")
+                ?: coachObjectName(obj),
             startingPlayers = starters.distinctBy { it.name },
             substitutePlayers = subs.distinctBy { it.name }
         )
+    }
+
+    /** A StatPal néha objektumként adja az edzőt: {"name": "...", "id": "..."}. */
+    private fun coachObjectName(obj: JsonObject): String? {
+        val coach = obj.entrySet()
+            .firstOrNull { normalize(it.key) == "coach" || normalize(it.key) == "manager" }
+            ?.value
+            ?.takeIf { it.isJsonObject }
+            ?.asJsonObject
+            ?: return null
+        return firstString(coach, "name", "full_name", "fullname")
     }
 
     private fun findTeamObject(root: JsonObject, teamName: String, preferHome: Boolean): JsonObject? {
