@@ -52,6 +52,7 @@ data class MatchLineup(
     val formation: String? = null,
     val coach: String? = null,
     val coachId: String? = null,
+    val isProjected: Boolean = false,
     val startingPlayers: List<LineupPlayer> = emptyList(),
     val substitutePlayers: List<LineupPlayer> = emptyList()
 )
