@@ -8,6 +8,8 @@ import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.data.model.MatchHighlight
 import com.example.tippscores.data.model.MatchStatistic
 import com.example.tippscores.data.model.PlayerProfile
+import com.example.tippscores.data.model.PlayerTransfer
+import com.example.tippscores.data.model.TeamTrophy
 import com.example.tippscores.data.remote.NetworkModule
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
@@ -60,10 +62,11 @@ class MatchDetailsRepository(
     }
 
     /**
-     * A StatPal "Get Player" végpontja (v2/soccer/players/{player_id}) - kor,
-     * nemzetiség, poszt, testmagasság/súly, piaci érték és szezon-statisztikák.
-     * A meglévő általános URL-alapú StatPal klienst használja, nincs szükség
-     * új Retrofit végpontra.
+     * A StatPal "Get Player" végpontja (v2/soccer/players/{player_id}).
+     *
+     * A szezon-statisztika a "club_league_statistics" listából jön (a
+     * játékos jelenlegi klubjának sora), a pályafutás-összesítés az
+     * "overall_club_statistics" blokkból. A kettőt nem keverjük.
      */
     suspend fun fetchPlayerProfile(playerId: String): PlayerProfile? {
         val key = statpalKeyProvider().trim()
@@ -75,16 +78,36 @@ class MatchDetailsRepository(
                 accessKey = key
             )
 
-            val playerObj = root.getAsJsonObject("player") ?: return null
+            val playerObj = objOrNull(root, "player") ?: return null
 
-            val overall = playerObj.getAsJsonObject("overall_club_statistics")
-            val leagueStats = playerObj.getAsJsonObject("club_league_statistics")
-                ?.getAsJsonArray("club")
-                ?.firstOrNull { it.isJsonObject }
-                ?.asJsonObject
+            val playerTeamId = firstString(playerObj, "team_id")
+            val clubs = objectList(objOrNull(playerObj, "club_league_statistics")?.get("club"))
+            val season = clubs.firstOrNull { firstString(it, "team_id") == playerTeamId }
+                ?: clubs.firstOrNull()
+            val overall = objOrNull(playerObj, "overall_club_statistics")
 
-            fun stat(vararg keys: String): String? =
-                overall?.let { firstString(it, *keys) } ?: leagueStats?.let { firstString(it, *keys) }
+            fun s(vararg keys: String): String? = season?.let { firstString(it, *keys) }
+            fun c(vararg keys: String): String? = overall?.let { firstString(it, *keys) }
+
+            val trophies = objectList(objOrNull(playerObj, "trophies")?.get("trophy"))
+                .mapNotNull { t ->
+                    val league = firstString(t, "league") ?: return@mapNotNull null
+                    TeamTrophy(
+                        league = league,
+                        country = firstString(t, "country"),
+                        status = firstString(t, "status"),
+                        count = firstString(t, "count"),
+                        seasons = firstString(t, "seasons")?.trim()?.trimEnd(',')?.trim()
+                    )
+                }
+
+            val transfers = mutableListOf<PlayerTransfer>()
+            collectTransfers(playerObj.get("transfers"), transfers)
+
+            val seasonLabel = listOfNotNull(
+                s("league"),
+                s("season")
+            ).joinToString(" ").takeIf { it.isNotBlank() }
 
             PlayerProfile(
                 id = firstString(playerObj, "id") ?: playerId,
@@ -97,17 +120,90 @@ class MatchDetailsRepository(
                 preferredFoot = firstString(playerObj, "preferred_foot"),
                 team = firstString(playerObj, "team"),
                 marketValueEur = firstString(playerObj, "market_value_eur"),
-                appearances = stat("appearances"),
-                goals = stat("goals"),
-                assists = stat("assists"),
-                minutesPlayed = stat("minutes_played"),
-                rating = stat("rating"),
-                yellowCards = stat("yellowcards"),
-                redCards = stat("redcards")
+                appearances = s("appearances", "appearences"),
+                goals = s("goals"),
+                assists = s("assists"),
+                minutesPlayed = s("minutes_played"),
+                rating = s("rating"),
+                yellowCards = s("yellowcards"),
+                redCards = s("redcards"),
+                birthdate = firstString(playerObj, "birthdate"),
+                birthplace = listOfNotNull(
+                    firstString(playerObj, "birthplace"),
+                    firstString(playerObj, "birthcountry")
+                ).distinct().joinToString(", ").takeIf { it.isNotBlank() },
+                seasonLabel = seasonLabel,
+                startingLineups = s("starting_lineups", "lineups"),
+                shotsTotal = s("shots_total"),
+                shotsOnTarget = s("shots_on_target", "shots_on"),
+                keyPasses = s("key_passes"),
+                dribbleAttempts = s("dribble_attempts"),
+                dribbleSuccess = s("dribble_success"),
+                duelsTotal = s("duels_total"),
+                duelsWon = s("duels_won"),
+                tackles = s("tackles"),
+                interceptions = s("interceptions"),
+                foulsCommitted = s("fouls_committed"),
+                foulsDrawn = s("fouls_drawn"),
+                penScored = s("pen_scored", "penalties_scored"),
+                penMissed = s("pen_missed", "penalties_missed"),
+                saves = s("saves"),
+                goalsConceded = s("goals_conceded"),
+                careerAppearances = c("appearances", "appearences"),
+                careerMinutes = c("minutes_played"),
+                careerAssists = c("assists"),
+                careerShotsTotal = c("shots_total"),
+                careerShotsOnTarget = c("shots_on_target", "shots_on"),
+                careerPenScored = c("pen_scored", "penalties_scored"),
+                careerRating = c("rating"),
+                trophies = trophies,
+                transfers = transfers
             )
         } catch (e: Exception) {
             e.printStackTrace()
             null
+        }
+    }
+
+    private fun objOrNull(obj: JsonObject?, name: String): JsonObject? =
+        obj?.get(name)?.takeIf { it.isJsonObject }?.asJsonObject
+
+    private fun objectList(element: JsonElement?): List<JsonObject> {
+        if (element == null || element.isJsonNull) return emptyList()
+        return when {
+            element.isJsonArray ->
+                element.asJsonArray.filter { it.isJsonObject }.map { it.asJsonObject }
+            element.isJsonObject -> listOf(element.asJsonObject)
+            else -> emptyList()
+        }
+    }
+
+    /**
+     * A játékos átigazolásainak pontos szerkezetét a StatPal mintában még
+     * nem láttuk (üres volt), ezért rugalmasan keressük: minden olyan
+     * objektum átigazolás, ahol van dátum és honnan / hova csapat.
+     */
+    private fun collectTransfers(element: JsonElement?, out: MutableList<PlayerTransfer>) {
+        if (element == null || element.isJsonNull) return
+        when {
+            element.isJsonArray -> element.asJsonArray.forEach { collectTransfers(it, out) }
+            element.isJsonObject -> {
+                val obj = element.asJsonObject
+                val from = firstString(obj, "from", "from_team", "team_from", "from_team_name")
+                val to = firstString(obj, "to", "to_team", "team_to", "to_team_name")
+                val date = firstString(obj, "date", "transfer_date")
+                if (date != null && (from != null || to != null)) {
+                    out += PlayerTransfer(
+                        date = date,
+                        from = from,
+                        to = to,
+                        type = firstString(obj, "type"),
+                        price = firstString(obj, "price", "fee")
+                    )
+                } else {
+                    obj.entrySet().forEach { collectTransfers(it.value, out) }
+                }
+            }
         }
     }
 
@@ -405,6 +501,7 @@ private object MatchDetailsParser {
             formation = firstString(obj, "formation", "system", "shape"),
             coach = firstString(obj, "coach", "manager", "coach_name", "manager_name")
                 ?: coachObjectName(obj),
+            coachId = coachObjectId(obj),
             startingPlayers = starters.distinctBy { it.name },
             substitutePlayers = subs.distinctBy { it.name }
         )
@@ -419,6 +516,16 @@ private object MatchDetailsParser {
             ?.asJsonObject
             ?: return null
         return firstString(coach, "name", "full_name", "fullname")
+    }
+
+    private fun coachObjectId(obj: JsonObject): String? {
+        val coach = obj.entrySet()
+            .firstOrNull { normalize(it.key) == "coach" || normalize(it.key) == "manager" }
+            ?.value
+            ?.takeIf { it.isJsonObject }
+            ?.asJsonObject
+            ?: return null
+        return firstString(coach, "id", "coach_id")
     }
 
     private fun findTeamObject(root: JsonObject, teamName: String, preferHome: Boolean): JsonObject? {
