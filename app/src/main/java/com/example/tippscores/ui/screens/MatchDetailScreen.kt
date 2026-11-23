@@ -1406,20 +1406,42 @@ private fun ExtraInfoCard(details: MatchDetails?) {
     if (details == null) return
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = colors.cardBackground
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (details.hasPrediction) {
-                Text("Előrejelzés: ${details.prediction}", color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🎯", fontSize = 18.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("Előrejelzés", color = colors.tertiaryText, fontSize = 10.sp)
+                        Text(details.prediction ?: "", color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
             }
             if (details.hasWeather) {
-                Text("Időjárás: ${details.weather}", color = colors.secondaryText, fontSize = 12.sp)
-                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🌤️", fontSize = 18.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("Időjárás", color = colors.tertiaryText, fontSize = 10.sp)
+                        Text(details.weather ?: "", color = colors.secondaryText, fontSize = 13.sp)
+                    }
+                }
             }
             if (details.hasInjuries) {
-                Text("Sérültek / eltiltások: ${details.injuries.joinToString(", ")}", color = colors.tertiaryText, fontSize = 11.sp)
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🏥", fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Sérültek / eltiltások", color = colors.tertiaryText, fontSize = 10.sp)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    details.injuries.forEach { injury ->
+                        Text("• $injury", color = colors.primaryText, fontSize = 12.sp, modifier = Modifier.padding(start = 28.dp))
+                    }
+                }
             }
         }
     }
