@@ -9,7 +9,20 @@ data class TeamProfile(
     val league: String? = null,
     val statistics: List<TeamProfileStatistic> = emptyList(),
     val recentMatches: List<TeamRecentMatch> = emptyList(),
-    val form: List<TeamFormItem> = emptyList()
+    val form: List<TeamFormItem> = emptyList(),
+
+    // StatPal "Get Team" (v2/soccer/teams/{team_id}) adatok
+    val founded: String? = null,
+    val venueName: String? = null,
+    val venueCity: String? = null,
+    val venueCapacity: String? = null,
+    val venueSurface: String? = null,
+    val coachName: String? = null,
+    val coachId: String? = null,
+    val leagueRecords: List<TeamLeagueRecord> = emptyList(),
+    val squad: List<TeamSquadPlayer> = emptyList(),
+    val transfers: List<TeamTransfer> = emptyList(),
+    val trophies: List<TeamTrophy> = emptyList()
 )
 
 data class TeamProfileStatistic(
@@ -34,4 +47,56 @@ data class TeamFormItem(
     val label: String,
     val score: String,
     val opponent: String
+)
+
+/** Egy bajnokság szezonmérlege (győzelem / döntetlen / vereség). */
+data class TeamLeagueRecord(
+    val leagueName: String,
+    val season: String = "",
+    val winsTotal: Int = 0,
+    val winsHome: Int = 0,
+    val winsAway: Int = 0,
+    val drawsTotal: Int = 0,
+    val drawsHome: Int = 0,
+    val drawsAway: Int = 0,
+    val lossesTotal: Int = 0,
+    val lossesHome: Int = 0,
+    val lossesAway: Int = 0,
+    val scoringMinutes: List<TeamMinuteBucket> = emptyList(),
+    val concededMinutes: List<TeamMinuteBucket> = emptyList()
+) {
+    val played: Int get() = winsTotal + drawsTotal + lossesTotal
+}
+
+data class TeamMinuteBucket(
+    val range: String,
+    val percent: Int = 0,
+    val count: Int = 0
+)
+
+data class TeamSquadPlayer(
+    val id: String? = null,
+    val name: String,
+    val number: String? = null,
+    val age: String? = null,
+    val position: String? = null,
+    val isCaptain: Boolean = false,
+    val injured: Boolean = false
+)
+
+data class TeamTransfer(
+    val playerName: String,
+    val date: String = "",
+    val otherTeam: String? = null,
+    val type: String? = null,
+    val price: String? = null,
+    val isIncoming: Boolean = true
+)
+
+data class TeamTrophy(
+    val league: String,
+    val country: String? = null,
+    val status: String? = null,
+    val count: String? = null,
+    val seasons: String? = null
 )
