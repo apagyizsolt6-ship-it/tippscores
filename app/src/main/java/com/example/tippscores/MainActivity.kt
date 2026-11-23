@@ -321,11 +321,7 @@ class MainActivity : ComponentActivity() {
                             },
 
                             onSaveKeys = { sKey ->
-
-                                viewModel.saveKeysAndRefresh(
-                                    sKey,
-                                    hKey
-                                )
+                                viewModel.saveKeysAndRefresh(sKey)
                             },
 
                             onToggleFavorite = { matchId ->
