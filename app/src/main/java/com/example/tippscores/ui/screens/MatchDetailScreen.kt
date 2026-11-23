@@ -229,7 +229,13 @@ fun MatchDetailScreen(
             }
 
             item {
-                TabRow(
+                if (details?.hasPrediction == true || details?.hasWeather == true || details?.hasInjuries == true) {
+                    ExtraInfoCard(details)
+                }
+            }
+
+            item {
+            TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = colors.cardBackground,
                     contentColor = Color(0xFF2563EB)
@@ -1391,5 +1397,30 @@ private fun EmptyDetailsCard(text: String) {
             color = colors.tertiaryText,
             fontSize = 11.sp
         )
+    }
+}
+
+@Composable
+private fun ExtraInfoCard(details: MatchDetails?) {
+    val colors = LocalAppColors.current
+    if (details == null) return
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = colors.cardBackground
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            if (details.hasPrediction) {
+                Text("Előrejelzés: ${details.prediction}", color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Spacer(Modifier.height(4.dp))
+            }
+            if (details.hasWeather) {
+                Text("Időjárás: ${details.weather}", color = colors.secondaryText, fontSize = 12.sp)
+                Spacer(Modifier.height(4.dp))
+            }
+            if (details.hasInjuries) {
+                Text("Sérültek / eltiltások: ${details.injuries.joinToString(", ")}", color = colors.tertiaryText, fontSize = 11.sp)
+            }
+        }
     }
 }
