@@ -119,7 +119,8 @@ fun MatchListScreen(
     onToggleFeaturedLeague: (String, Boolean, Boolean) -> Unit,
     onDarkModeChange: (Boolean) -> Unit,
     onGoalNotificationsChange: (Boolean) -> Unit,
-    onMatchClick: (String) -> Unit
+    onMatchClick: (String) -> Unit,
+    lastUpdated: String? = null
 ) {
 
     val colors = LocalAppColors.current
@@ -354,6 +355,14 @@ fun MatchListScreen(
                             fontSize =
                                 11.sp
                         )
+
+                        if (!lastUpdated.isNullOrBlank()) {
+                            Text(
+                                text = lastUpdated,
+                                color = Color(0xFF8A9BB8),
+                                fontSize = 10.sp
+                            )
+                        }
                     }
 
                     Row(
@@ -1140,8 +1149,8 @@ fun MatchListScreen(
                         val (title, subtitle) =
                             when {
                                 selectedTab == BottomTab.LIVE ->
-                                    "Nincs élő mérkőzés." to
-                                        "Nézz vissza később, vagy válts az Összes fülre."
+                                    "Nincs élő mérkőzés most." to
+                                        "Az élő meccsek automatikusan frissülnek. Nézz vissza később."
 
                                 selectedTab == BottomTab.FAVORITES ->
                                     "Még nincs kedvenc mérkőzésed." to
