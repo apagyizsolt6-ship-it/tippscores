@@ -29,9 +29,11 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.local.AppDatabase
+import com.example.tippscores.data.repository.CoachProfileRepository
 import com.example.tippscores.data.repository.MatchRepository
 import com.example.tippscores.data.repository.TeamProfileRepository
 import com.example.tippscores.notifications.GoalCheckWorker
+import com.example.tippscores.ui.screens.CoachProfileScreen
 import com.example.tippscores.ui.screens.MatchDetailScreen
 import com.example.tippscores.ui.screens.MatchListScreen
 import com.example.tippscores.ui.screens.TeamProfileScreen
@@ -58,6 +60,12 @@ class MainActivity : ComponentActivity() {
 
     private val teamProfileRepository by lazy {
         TeamProfileRepository(
+            statpalKeyProvider = { apiPreferences.statpalApiKey }
+        )
+    }
+
+    private val coachProfileRepository by lazy {
+        CoachProfileRepository(
             statpalKeyProvider = { apiPreferences.statpalApiKey }
         )
     }
@@ -215,6 +223,16 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf<String?>(null)
                 }
 
+            var selectedCoachId by
+                remember {
+                    mutableStateOf<String?>(null)
+                }
+
+            var selectedCoachName by
+                remember {
+                    mutableStateOf("")
+                }
+
             MaterialTheme(
                 colorScheme =
                     if (darkMode) darkColorScheme() else lightColorScheme()
@@ -228,7 +246,10 @@ class MainActivity : ComponentActivity() {
 
                     val currentTeamName = selectedTeamName
 
+                    val currentCoachId = selectedCoachId
+
                     val screenKey = when {
+                        currentCoachId != null -> "coach"
                         currentTeamName != null -> "team"
                         currentMatchId != null -> "match"
                         else -> "list"
@@ -242,13 +263,29 @@ class MainActivity : ComponentActivity() {
                         label = "screenTransition"
                     ) { key ->
 
-                    if (key == "team" && currentTeamName != null) {
+                    if (key == "coach" && currentCoachId != null) {
+
+                        CoachProfileScreen(
+                            coachId = currentCoachId,
+                            coachName = selectedCoachName,
+                            repository = coachProfileRepository,
+                            onBack = {
+                                selectedCoachId = null
+                                selectedCoachName = ""
+                            }
+                        )
+
+                    } else if (key == "team" && currentTeamName != null) {
 
                         TeamProfileScreen(
                             teamId = selectedTeamId,
                             teamName = currentTeamName,
                             fallbackLogoUrl = selectedTeamLogo,
                             repository = teamProfileRepository,
+                            onCoachClick = { coachId, coachName ->
+                                selectedCoachId = coachId
+                                selectedCoachName = coachName
+                            },
                             onBack = {
                                 selectedTeamName = null
                                 selectedTeamLogo = ""
@@ -293,6 +330,11 @@ class MainActivity : ComponentActivity() {
 
                             onToggleFollowTeam = { teamName ->
                                 viewModel.toggleFavoriteTeam(teamName)
+                            },
+
+                            onCoachClick = { coachId, coachName ->
+                                selectedCoachId = coachId
+                                selectedCoachName = coachName
                             },
 
                             onTeamClick = { teamName, logoUrl ->
