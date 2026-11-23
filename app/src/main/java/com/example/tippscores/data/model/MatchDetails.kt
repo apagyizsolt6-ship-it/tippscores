@@ -51,6 +51,7 @@ data class MatchEvent(
 data class MatchLineup(
     val formation: String? = null,
     val coach: String? = null,
+    val coachId: String? = null,
     val startingPlayers: List<LineupPlayer> = emptyList(),
     val substitutePlayers: List<LineupPlayer> = emptyList()
 )
@@ -80,11 +81,53 @@ data class PlayerProfile(
     val preferredFoot: String? = null,
     val team: String? = null,
     val marketValueEur: String? = null,
+
+    // Aktuális szezon (a játékos bajnokságának statisztikája)
     val appearances: String? = null,
     val goals: String? = null,
     val assists: String? = null,
     val minutesPlayed: String? = null,
     val rating: String? = null,
     val yellowCards: String? = null,
-    val redCards: String? = null
+    val redCards: String? = null,
+
+    val birthdate: String? = null,
+    val birthplace: String? = null,
+    val seasonLabel: String? = null,
+    val startingLineups: String? = null,
+    val shotsTotal: String? = null,
+    val shotsOnTarget: String? = null,
+    val keyPasses: String? = null,
+    val dribbleAttempts: String? = null,
+    val dribbleSuccess: String? = null,
+    val duelsTotal: String? = null,
+    val duelsWon: String? = null,
+    val tackles: String? = null,
+    val interceptions: String? = null,
+    val foulsCommitted: String? = null,
+    val foulsDrawn: String? = null,
+    val penScored: String? = null,
+    val penMissed: String? = null,
+    val saves: String? = null,
+    val goalsConceded: String? = null,
+
+    // Klubkarrier (összes szezon együtt)
+    val careerAppearances: String? = null,
+    val careerMinutes: String? = null,
+    val careerAssists: String? = null,
+    val careerShotsTotal: String? = null,
+    val careerShotsOnTarget: String? = null,
+    val careerPenScored: String? = null,
+    val careerRating: String? = null,
+
+    val trophies: List<TeamTrophy> = emptyList(),
+    val transfers: List<PlayerTransfer> = emptyList()
+)
+
+data class PlayerTransfer(
+    val date: String = "",
+    val from: String? = null,
+    val to: String? = null,
+    val type: String? = null,
+    val price: String? = null
 )
