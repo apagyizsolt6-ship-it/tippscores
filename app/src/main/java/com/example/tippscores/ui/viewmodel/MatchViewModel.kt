@@ -217,7 +217,9 @@ class MatchViewModel(
                 _matchDetails.value = detailsRepository.fetch(
                     matchId = match.id,
                     homeTeam = match.homeTeam,
-                    awayTeam = match.awayTeam
+                    awayTeam = match.awayTeam,
+                    homeTeamId = match.homeTeamId,
+                    awayTeamId = match.awayTeamId
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
