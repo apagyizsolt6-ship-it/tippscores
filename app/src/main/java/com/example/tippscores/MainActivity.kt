@@ -57,7 +57,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private val teamProfileRepository by lazy {
-        TeamProfileRepository()
+        TeamProfileRepository(
+            statpalKeyProvider = { apiPreferences.statpalApiKey }
+        )
     }
 
     private val detailsRepository by lazy {
@@ -208,6 +210,11 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf("")
                 }
 
+            var selectedTeamId by
+                remember {
+                    mutableStateOf<String?>(null)
+                }
+
             MaterialTheme(
                 colorScheme =
                     if (darkMode) darkColorScheme() else lightColorScheme()
@@ -238,12 +245,14 @@ class MainActivity : ComponentActivity() {
                     if (key == "team" && currentTeamName != null) {
 
                         TeamProfileScreen(
+                            teamId = selectedTeamId,
                             teamName = currentTeamName,
                             fallbackLogoUrl = selectedTeamLogo,
                             repository = teamProfileRepository,
                             onBack = {
                                 selectedTeamName = null
                                 selectedTeamLogo = ""
+                                selectedTeamId = null
                             }
                         )
 
@@ -287,6 +296,21 @@ class MainActivity : ComponentActivity() {
                             },
 
                             onTeamClick = { teamName, logoUrl ->
+                                // A StatPal csapatprofil azonosítót vár, ezért a
+                                // megnyitott meccsből keressük ki a csapat ID-ját.
+                                val openMatch =
+                                    matches.find { it.id == currentMatchId }
+
+                                selectedTeamId =
+                                    when {
+                                        openMatch == null -> null
+                                        openMatch.homeTeam == teamName ->
+                                            openMatch.homeTeamId
+                                        openMatch.awayTeam == teamName ->
+                                            openMatch.awayTeamId
+                                        else -> null
+                                    }
+
                                 selectedTeamName = teamName
                                 selectedTeamLogo = logoUrl
                             }
