@@ -207,7 +207,7 @@ fun MatchListScreen(
 
     // Ha az Élő fülre váltunk, ugorjunk a mai napra (élő meccs
     // csak ma lehet), és onnantól 30 másodpercenként frissítsünk
-    // automatikusan, amíg ezen a fülön vagyunk.
+    // automatikusan, amíg ezen a fülön vagyunk ÉS van élő meccs.
     LaunchedEffect(selectedTab) {
         if (selectedTab == BottomTab.LIVE) {
             if (selectedOffset != 0) {
@@ -215,7 +215,10 @@ fun MatchListScreen(
             }
             while (true) {
                 delay(30_000)
-                onRefresh()
+                // Csak akkor frissítsünk, ha valóban vannak élő meccsek
+                if (matches.any { it.isLive }) {
+                    onRefresh()
+                }
             }
         }
     }
