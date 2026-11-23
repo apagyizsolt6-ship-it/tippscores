@@ -68,7 +68,6 @@ import com.example.tippscores.data.model.HeadToHeadMatch
 import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.data.model.PlayerProfile
 import com.example.tippscores.data.repository.MatchDetailsRepository
-import com.example.tippscores.ui.components.FullPitchLineupCard
 import com.example.tippscores.ui.theme.LocalAppColors
 import java.util.Locale
 
@@ -84,8 +83,7 @@ fun MatchDetailScreen(
     onBack: () -> Unit,
     onToggleFavorite: (String) -> Unit,
     onToggleFollowTeam: (String) -> Unit,
-    onTeamClick: (String, String) -> Unit,
-    onCoachClick: (String, String) -> Unit = { _, _ -> }
+    onTeamClick: (String, String) -> Unit
 ) {
     val colors = LocalAppColors.current
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -337,57 +335,29 @@ fun MatchDetailScreen(
                     }
 
                     2 -> {
-                        val homeLineup = details?.homeLineup ?: MatchLineup()
-                        val awayLineup = details?.awayLineup ?: MatchLineup()
-                        val hasStarters =
-                            homeLineup.startingPlayers.isNotEmpty() ||
-                                awayLineup.startingPlayers.isNotEmpty()
-
-                        if (hasStarters) {
-                            // Egy közös pálya: hazai felül, vendég alul.
-                            item {
-                                FullPitchLineupCard(
-                                    homeTeam = match.homeTeam,
-                                    awayTeam = match.awayTeam,
-                                    home = homeLineup,
-                                    away = awayLineup,
-                                    events = details?.events.orEmpty(),
-                                    onPlayerClick = { player, teamName ->
-                                        selectedPlayer = player
-                                        selectedPlayerTeam = teamName
-                                    },
-                                    onCoachClick = onCoachClick
-                                )
-                            }
-                        } else if (details?.hasLineups == true) {
-                            // Csak cserepad érkezett: a régi, listás nézet.
-                            item {
-                                LineupSection(
-                                    title = match.homeTeam,
-                                    lineup = homeLineup,
-                                    onPlayerClick = { player ->
-                                        selectedPlayer = player
-                                        selectedPlayerTeam = match.homeTeam
-                                    },
-                                    onCoachClick = onCoachClick
-                                )
-                            }
-                            item {
-                                LineupSection(
-                                    title = match.awayTeam,
-                                    lineup = awayLineup,
-                                    onPlayerClick = { player ->
-                                        selectedPlayer = player
-                                        selectedPlayerTeam = match.awayTeam
-                                    },
-                                    onCoachClick = onCoachClick
-                                )
-                            }
+                        item {
+                            LineupSection(
+                                title = match.homeTeam,
+                                lineup = details?.homeLineup ?: MatchLineup(),
+                                onPlayerClick = { player ->
+                                    selectedPlayer = player
+                                    selectedPlayerTeam = match.homeTeam
+                                }
+                            )
                         }
-
+                        item {
+                            LineupSection(
+                                title = match.awayTeam,
+                                lineup = details?.awayLineup ?: MatchLineup(),
+                                onPlayerClick = { player ->
+                                    selectedPlayer = player
+                                    selectedPlayerTeam = match.awayTeam
+                                }
+                            )
+                        }
                         if (details?.hasLineups != true) {
                             item {
-                                EmptyDetailsCard("A kezdőcsapat és a cserepad ehhez a mérkőzéshez jelenleg nem érhető el.")
+                                EmptyDetailsCard("A kezdőcsapat és a cserepad jelenleg nem érhető el.")
                             }
                         }
                     }
@@ -743,8 +713,7 @@ private fun eventIcon(type: String): String =
 private fun LineupSection(
     title: String,
     lineup: MatchLineup,
-    onPlayerClick: (LineupPlayer) -> Unit,
-    onCoachClick: (String, String) -> Unit
+    onPlayerClick: (LineupPlayer) -> Unit
 ) {
     val colors = LocalAppColors.current
     Surface(
@@ -760,33 +729,14 @@ private fun LineupSection(
                 fontSize = 15.sp
             )
 
-            val formationText = lineup.formation?.takeIf { it.isNotBlank() }
-            val coachText = lineup.coach?.takeIf { it.isNotBlank() }
-            val coachId = lineup.coachId?.takeIf { it.isNotBlank() }
+            val meta = listOfNotNull(
+                lineup.formation?.takeIf { it.isNotBlank() },
+                lineup.coach?.takeIf { it.isNotBlank() }
+            ).joinToString(" • ")
 
-            if (formationText != null || coachText != null) {
+            if (meta.isNotBlank()) {
                 Spacer(Modifier.height(3.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (formationText != null) {
-                        Text(formationText, color = colors.tertiaryText, fontSize = 10.sp)
-                    }
-                    if (formationText != null && coachText != null) {
-                        Text(" • ", color = colors.tertiaryText, fontSize = 10.sp)
-                    }
-                    if (coachText != null) {
-                        if (coachId != null) {
-                            Text(
-                                "$coachText ›",
-                                color = Color(0xFF2563EB),
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 10.sp,
-                                modifier = Modifier.clickable { onCoachClick(coachId, coachText) }
-                            )
-                        } else {
-                            Text(coachText, color = colors.tertiaryText, fontSize = 10.sp)
-                        }
-                    }
-                }
+                Text(meta, color = colors.tertiaryText, fontSize = 10.sp)
             }
 
             Spacer(Modifier.height(10.dp))
@@ -838,48 +788,34 @@ private fun PitchView(lineup: MatchLineup, onPlayerClick: (LineupPlayer) -> Unit
     ) {
 
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val lineColor = Color.White.copy(alpha = 0.55f)
+            val stroke = Stroke(width = 1.8.dp.toPx())
+            val margin = 6.dp.toPx()
+            val w = size.width
+            val h = size.height
 
-            val lineColor = Color.White.copy(alpha = 0.45f)
-            val stroke = Stroke(width = 1.5.dp.toPx())
-            val margin = 8.dp.toPx()
+            // Outer boundary
+            drawRect(color = lineColor, topLeft = Offset(margin, margin),
+                size = Size(w - margin * 2, h - margin * 2), style = stroke)
 
-            drawRect(
-                color = lineColor,
-                topLeft = Offset(margin, margin),
-                size = Size(size.width - margin * 2, size.height - margin * 2),
-                style = stroke
-            )
+            // Halfway line
+            drawLine(lineColor, Offset(margin, h / 2f), Offset(w - margin, h / 2f), stroke.width)
 
-            drawLine(
-                color = lineColor,
-                start = Offset(margin, size.height / 2f),
-                end = Offset(size.width - margin, size.height / 2f),
-                strokeWidth = stroke.width
-            )
+            // Center circle
+            drawCircle(lineColor, radius = w * 0.14f, center = Offset(w / 2f, h / 2f), style = stroke)
+            drawCircle(lineColor, radius = 3.dp.toPx(), center = Offset(w / 2f, h / 2f))
 
-            drawCircle(
-                color = lineColor,
-                radius = size.width * 0.16f,
-                center = Offset(size.width / 2f, size.height / 2f),
-                style = stroke
-            )
+            // Penalty areas
+            val boxW = w * 0.62f
+            val boxH = h * 0.16f
+            drawRect(lineColor, Offset((w - boxW) / 2f, margin), Size(boxW, boxH), style = stroke)
+            drawRect(lineColor, Offset((w - boxW) / 2f, h - margin - boxH), Size(boxW, boxH), style = stroke)
 
-            val boxWidth = size.width * 0.56f
-            val boxHeight = size.height * 0.13f
-
-            drawRect(
-                color = lineColor,
-                topLeft = Offset((size.width - boxWidth) / 2f, margin),
-                size = Size(boxWidth, boxHeight),
-                style = stroke
-            )
-
-            drawRect(
-                color = lineColor,
-                topLeft = Offset((size.width - boxWidth) / 2f, size.height - margin - boxHeight),
-                size = Size(boxWidth, boxHeight),
-                style = stroke
-            )
+            // Goal areas (6-yard boxes)
+            val goalW = w * 0.32f
+            val goalH = h * 0.07f
+            drawRect(lineColor, Offset((w - goalW) / 2f, margin), Size(goalW, goalH), style = stroke)
+            drawRect(lineColor, Offset((w - goalW) / 2f, h - margin - goalH), Size(goalW, goalH), style = stroke)
         }
 
         Column(
@@ -1097,8 +1033,6 @@ private fun PlayerCardDialog(
                     profile != null -> {
                         PlayerInfoRow("Kor", profile.age)
                         PlayerInfoRow("Nemzetiség", profile.nationality)
-                        PlayerInfoRow("Születési dátum", profile.birthdate)
-                        PlayerInfoRow("Születési hely", profile.birthplace)
                         PlayerInfoRow("Magasság", profile.height?.let { "$it cm" })
                         PlayerInfoRow("Testsúly", profile.weight?.let { "$it kg" })
                         PlayerInfoRow("Erősebb láb", translatePreferredFoot(profile.preferredFoot))
@@ -1109,7 +1043,7 @@ private fun PlayerCardDialog(
                         Spacer(Modifier.height(10.dp))
 
                         Text(
-                            profile.seasonLabel?.let { "Szezon statisztika – $it" } ?: "Szezon statisztika",
+                            "Szezon statisztika",
                             color = colors.tertiaryText,
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.sp
@@ -1120,91 +1054,9 @@ private fun PlayerCardDialog(
                         PlayerInfoRow("Gólok", profile.goals)
                         PlayerInfoRow("Gólpasszok", profile.assists)
                         PlayerInfoRow("Percek a pályán", profile.minutesPlayed)
-                        PlayerInfoRow("Értékelés", shortRating(profile.rating))
+                        PlayerInfoRow("Értékelés", profile.rating)
                         PlayerInfoRow("Sárga lap", profile.yellowCards)
                         PlayerInfoRow("Piros lap", profile.redCards)
-                        PlayerInfoRow("Kezdőként", profile.startingLineups)
-                        PlayerInfoRow("Lövések (kapura)", pairText(profile.shotsTotal, profile.shotsOnTarget))
-                        PlayerInfoRow("Kulcspasszok", profile.keyPasses)
-                        PlayerInfoRow("Cselek (sikeres / összes)", ratioText(profile.dribbleSuccess, profile.dribbleAttempts))
-                        PlayerInfoRow("Párharcok (nyert / összes)", ratioText(profile.duelsWon, profile.duelsTotal))
-                        PlayerInfoRow("Szerelések", profile.tackles)
-                        PlayerInfoRow("Labdaszerzések", profile.interceptions)
-                        PlayerInfoRow("Elkövetett szabálytalanság", profile.foulsCommitted)
-                        PlayerInfoRow("Kiharcolt szabálytalanság", profile.foulsDrawn)
-                        PlayerInfoRow("Tizenegyes (gól / kihagyott)", ratioText(profile.penScored, profile.penMissed))
-                        PlayerInfoRow("Védések", profile.saves)
-                        PlayerInfoRow("Kapott gólok", profile.goalsConceded?.takeIf { profile.saves != null })
-
-                        val hasCareer = listOf(
-                            profile.careerAppearances, profile.careerMinutes, profile.careerAssists,
-                            profile.careerShotsTotal, profile.careerPenScored, profile.careerRating
-                        ).any { !it.isNullOrBlank() }
-
-                        if (hasCareer) {
-                            Spacer(Modifier.height(10.dp))
-                            HorizontalDivider(color = colors.divider)
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                "Klubkarrier (összesen)",
-                                color = colors.tertiaryText,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            PlayerInfoRow("Mérkőzések", profile.careerAppearances)
-                            PlayerInfoRow("Percek a pályán", profile.careerMinutes)
-                            PlayerInfoRow("Gólpasszok", profile.careerAssists)
-                            PlayerInfoRow("Lövések (kapura)", pairText(profile.careerShotsTotal, profile.careerShotsOnTarget))
-                            PlayerInfoRow("Tizenegyesgólok", profile.careerPenScored)
-                            PlayerInfoRow("Átlag értékelés", shortRating(profile.careerRating))
-                        }
-
-                        if (profile.trophies.isNotEmpty()) {
-                            Spacer(Modifier.height(10.dp))
-                            HorizontalDivider(color = colors.divider)
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                "Trófeák",
-                                color = colors.tertiaryText,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            profile.trophies.forEach { trophy ->
-                                PlayerInfoRow(
-                                    trophy.league,
-                                    listOfNotNull(trophy.status, trophy.count?.let { "×$it" })
-                                        .joinToString(" ")
-                                        .takeIf { it.isNotBlank() }
-                                )
-                            }
-                        }
-
-                        if (profile.transfers.isNotEmpty()) {
-                            Spacer(Modifier.height(10.dp))
-                            HorizontalDivider(color = colors.divider)
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                "Átigazolások",
-                                color = colors.tertiaryText,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            profile.transfers.take(8).forEach { transfer ->
-                                PlayerInfoRow(
-                                    transfer.date,
-                                    listOfNotNull(
-                                        listOfNotNull(transfer.from, transfer.to)
-                                            .joinToString(" → ")
-                                            .takeIf { it.isNotBlank() },
-                                        transfer.type,
-                                        transfer.price
-                                    ).joinToString(" • ")
-                                )
-                            }
-                        }
                     }
 
                     player.id == null -> {
@@ -1276,24 +1128,6 @@ private fun PlayerInfoRow(label: String, value: String?) {
         )
     }
 }
-
-private fun shortRating(raw: String?): String? =
-    raw?.toDoubleOrNull()?.let { "%.2f".format(it) } ?: raw
-
-private fun pairText(total: String?, inner: String?): String? =
-    when {
-        total.isNullOrBlank() -> null
-        inner.isNullOrBlank() -> total
-        else -> "$total ($inner)"
-    }
-
-private fun ratioText(first: String?, second: String?): String? =
-    when {
-        first.isNullOrBlank() && second.isNullOrBlank() -> null
-        second.isNullOrBlank() -> first
-        first.isNullOrBlank() -> "– / $second"
-        else -> "$first / $second"
-    }
 
 private fun translatePreferredFoot(foot: String?): String? =
     when (foot?.trim()?.lowercase(Locale.ROOT)) {
