@@ -43,6 +43,9 @@ class MatchDetailsRepository(
         )
 
         val h2h = async { fetchHeadToHead(homeTeamId, awayTeamId) }
+        val prediction = async { fetchPrediction(matchId) }
+        val weather = async { fetchWeather(matchId) }
+        val injuries = async { fetchInjuries() }
 
         MatchDetails(
             statistics = parsed.statistics,
@@ -50,7 +53,10 @@ class MatchDetailsRepository(
             homeLineup = parsed.homeLineup,
             awayLineup = parsed.awayLineup,
             headToHead = h2h.await(),
-            highlight = null
+            highlight = null,
+            prediction = prediction.await(),
+            weather = weather.await(),
+            injuries = injuries.await()
         )
     }
 
@@ -124,6 +130,48 @@ class MatchDetailsRepository(
             }
         }
         return null
+    }
+
+    private suspend fun fetchPrediction(matchId: String): String? {
+        val key = statpalKeyProvider().trim()
+        if (key.isEmpty() || matchId.isBlank()) return null
+        return try {
+            val root = NetworkModule.statpalMatchDetailsApi.getDetails(
+                url = "https://statpal.io/api/v2/soccer/predictions?match_id=$matchId",
+                accessKey = key
+            )
+            root.getAsJsonObject("prediction")?.get("outcome")?.asString
+                ?: root.get("prediction")?.asString
+        } catch (_: Exception) { null }
+    }
+
+    private suspend fun fetchWeather(matchId: String): String? {
+        val key = statpalKeyProvider().trim()
+        if (key.isEmpty() || matchId.isBlank()) return null
+        return try {
+            val root = NetworkModule.statpalMatchDetailsApi.getDetails(
+                url = "https://statpal.io/api/v2/soccer/weather-forecast?match_id=$matchId",
+                accessKey = key
+            )
+            val temp = root.getAsJsonObject("weather")?.get("temperature")?.asString
+            val cond = root.getAsJsonObject("weather")?.get("condition")?.asString
+            listOfNotNull(temp, cond).joinToString(" • ").ifBlank { null }
+        } catch (_: Exception) { null }
+    }
+
+    private suspend fun fetchInjuries(): List<String> {
+        val key = statpalKeyProvider().trim()
+        if (key.isEmpty()) return emptyList()
+        return try {
+            val root = NetworkModule.statpalMatchDetailsApi.getDetails(
+                url = "https://statpal.io/api/v2/soccer/injuries-suspensions",
+                accessKey = key
+            )
+            // Simple extraction - adjust based on actual response structure
+            root.getAsJsonArray("injuries")?.mapNotNull { 
+                it.asJsonObject.get("player")?.asString 
+            }?.take(5) ?: emptyList()
+        } catch (_: Exception) { emptyList() }
     }
 
     private suspend fun fetchHeadToHead(
