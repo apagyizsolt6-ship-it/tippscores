@@ -355,8 +355,8 @@ class MatchRepository(
     // NÉPSZERŰ CSAPATOK LOGÓ FALLBACK (ha az API nem ad logót)
     // ========================================================
 
-    private val popularTeamLogos = mapOf(
-        // Angol
+        private val popularTeamLogos = mapOf(
+        // Angol Premier League
         "manchestercity" to "https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg",
         "manchesterunited" to "https://upload.wikimedia.org/wikipedia/en/7/7a/Manchester_United_FC_crest.svg",
         "liverpool" to "https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg",
@@ -365,35 +365,42 @@ class MatchRepository(
         "tottenham" to "https://upload.wikimedia.org/wikipedia/en/b/b4/Tottenham_Hotspur.svg",
         "newcastle" to "https://upload.wikimedia.org/wikipedia/en/5/56/Newcastle_United_Logo.svg",
         "astonvilla" to "https://upload.wikimedia.org/wikipedia/en/f/f9/Aston_Villa_FC_crest_%282016%29.svg",
+        "brighton" to "https://upload.wikimedia.org/wikipedia/en/f/fd/Brighton_%26_Hove_Albion_logo.svg",
+        "westham" to "https://upload.wikimedia.org/wikipedia/en/c/c2/West_Ham_United_FC_logo.svg",
         // Spanyol
         "realmadrid" to "https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg",
         "barcelona" to "https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg",
         "atleticomadrid" to "https://upload.wikimedia.org/wikipedia/en/f/f4/Atletico_Madrid_2017_logo.svg",
         "sevilla" to "https://upload.wikimedia.org/wikipedia/en/3/3b/Sevilla_FC_logo.svg",
         "valencia" to "https://upload.wikimedia.org/wikipedia/en/c/ce/Valenciacf.svg",
+        "athletic" to "https://upload.wikimedia.org/wikipedia/en/9/98/Club_Athletic_Bilbao_logo.svg",
         // Német
         "bayern" to "https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg",
         "bayernmunich" to "https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg",
         "dortmund" to "https://upload.wikimedia.org/wikipedia/commons/6/67/Borussia_Dortmund_logo.svg",
         "leverkusen" to "https://upload.wikimedia.org/wikipedia/en/5/59/Bayer_04_Leverkusen_logo.svg",
         "leipzig" to "https://upload.wikimedia.org/wikipedia/en/0/04/RB_Leipzig_2014_logo.svg",
+        "frankfurt" to "https://upload.wikimedia.org/wikipedia/commons/0/04/Eintracht_Frankfurt_Logo.svg",
         // Olasz
         "juventus" to "https://upload.wikimedia.org/wikipedia/commons/1/15/Juventus_FC_2017_logo.svg",
         "inter" to "https://upload.wikimedia.org/wikipedia/commons/0/05/FC_Internazionale_Milano_2021.svg",
         "milan" to "https://upload.wikimedia.org/wikipedia/commons/d/d0/Logo_of_AC_Milan.svg",
         "napoli" to "https://upload.wikimedia.org/wikipedia/commons/2/2d/SSC_Neapel.svg",
         "roma" to "https://upload.wikimedia.org/wikipedia/en/f/f7/AS_Roma_logo_%282017%29.svg",
+        "lazio" to "https://upload.wikimedia.org/wikipedia/en/c/ce/S.S._Lazio_badge.svg",
         // Francia
         "psg" to "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg",
         "paris" to "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg",
         "marseille" to "https://upload.wikimedia.org/wikipedia/commons/d/d8/Olympique_Marseille_logo.svg",
         "lyon" to "https://upload.wikimedia.org/wikipedia/en/c/c6/Olympique_Lyonnais.svg",
+        "monaco" to "https://upload.wikimedia.org/wikipedia/en/b/ba/AS_Monaco_FC.svg",
         // Magyar
         "ferencvaros" to "https://upload.wikimedia.org/wikipedia/en/8/8a/Ferencvarosi_TC_logo.svg",
         "ftc" to "https://upload.wikimedia.org/wikipedia/en/8/8a/Ferencvarosi_TC_logo.svg",
         "ujpest" to "https://upload.wikimedia.org/wikipedia/en/2/2e/Ujpest_FC_logo.svg",
         "debrecen" to "https://upload.wikimedia.org/wikipedia/en/4/4a/Debreceni_VSC_logo.svg",
-        "honved" to "https://upload.wikimedia.org/wikipedia/en/1/1a/Budapest_Honved_FC_logo.svg"
+        "honved" to "https://upload.wikimedia.org/wikipedia/en/1/1a/Budapest_Honved_FC_logo.svg",
+        "puskas" to "https://upload.wikimedia.org/wikipedia/en/5/5a/Puskas_Akademia_FC_logo.svg"
     )
 
     private fun findTeamLogo(
