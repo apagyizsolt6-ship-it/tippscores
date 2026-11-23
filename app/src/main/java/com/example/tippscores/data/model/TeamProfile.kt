@@ -53,6 +53,7 @@ data class TeamFormItem(
 data class TeamLeagueRecord(
     val leagueName: String,
     val season: String = "",
+    val leagueId: String = "",
     val winsTotal: Int = 0,
     val winsHome: Int = 0,
     val winsAway: Int = 0,
@@ -99,4 +100,27 @@ data class TeamTrophy(
     val status: String? = null,
     val count: String? = null,
     val seasons: String? = null
+)
+
+/** Egy játékos szezonstatisztikája a bajnoki (leagues/{id}/stats) válaszból. */
+data class LeaguePlayerStat(
+    val playerId: String? = null,
+    val name: String,
+    val teamId: String? = null,
+    val teamName: String = "",
+    val number: String? = null,
+    val position: String? = null,
+    val appearances: Int = 0,
+    val minutes: Int = 0,
+    val goals: Int = 0,
+    val assists: Int = 0,
+    val yellowCards: Int = 0,
+    val redCards: Int = 0,
+    val rating: Double? = null
+)
+
+data class LeagueStats(
+    val leagueId: String,
+    val leagueName: String,
+    val players: List<LeaguePlayerStat> = emptyList()
 )
