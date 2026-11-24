@@ -30,7 +30,8 @@ fun LeagueHeader(
     isCollapsed: Boolean = false,
     isFeatured: Boolean = false,
     onToggleCollapse: () -> Unit = {},
-    onToggleFeatured: () -> Unit = {}
+    onToggleFeatured: () -> Unit = {},
+    onOpenLeague: (() -> Unit)? = null
 ) {
 
     val colors = LocalAppColors.current
@@ -156,6 +157,19 @@ fun LeagueHeader(
             modifier =
                 Modifier.weight(1f)
         )
+
+        if (onOpenLeague != null) {
+            Text(
+                text = "📊",
+
+                fontSize = 14.sp,
+
+                modifier =
+                    Modifier
+                        .padding(horizontal = 4.dp)
+                        .clickable(onClick = onOpenLeague)
+            )
+        }
 
         Text(
             text =

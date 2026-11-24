@@ -41,6 +41,7 @@ import coil.compose.AsyncImage
 import com.example.tippscores.data.model.LineupPlayer
 import com.example.tippscores.data.model.MatchEvent
 import com.example.tippscores.data.model.MatchLineup
+import com.example.tippscores.data.remote.StatpalImages
 import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
 import java.text.Normalizer
@@ -428,36 +429,27 @@ private fun PitchMarker(
     ) {
         Box(modifier = Modifier.size(38.dp)) {
 
-            if (!player.photoUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = player.photoUrl,
-                    contentDescription = "${player.name} fotója",
-                    modifier = Modifier
-                        .size(34.dp)
-                        .align(Alignment.Center)
-                        .clip(CircleShape)
-                        .border(2.dp, fill, CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Surface(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .align(Alignment.Center)
-                        .border(1.5.dp, Color.White, CircleShape),
-                    shape = CircleShape,
-                    color = fill
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = player.number?.takeIf { it.isNotBlank() } ?: "·",
-                            color = if (isKeeper) Color(0xFF422006) else Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
+            val imageUrl = player.photoUrl?.takeIf { it.isNotBlank() }
+                ?: StatpalImages.player(player.id)
+
+            RemoteImage(
+                url = imageUrl,
+                contentDescription = "${player.name} fotója",
+                modifier = Modifier
+                    .size(34.dp)
+                    .align(Alignment.Center)
+                    .clip(CircleShape)
+                    .border(2.dp, fill, CircleShape),
+                contentScale = ContentScale.Crop,
+                fallback = {
+                    NumberCircle(
+                        number = player.number,
+                        fill = fill,
+                        isKeeper = isKeeper,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
                 }
-            }
+            )
 
             if (player.isCaptain) {
                 Surface(
@@ -686,4 +678,29 @@ private fun normalize(value: String): String =
 private fun lastName(fullName: String): String {
     val parts = fullName.trim().split(" ").filter { it.isNotBlank() }
     return if (parts.isEmpty()) fullName else parts.last()
+}
+
+@Composable
+private fun NumberCircle(
+    number: String?,
+    fill: Color,
+    isKeeper: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .size(34.dp)
+            .border(1.5.dp, Color.White, CircleShape),
+        shape = CircleShape,
+        color = fill
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = number?.takeIf { it.isNotBlank() } ?: "·",
+                color = if (isKeeper) Color(0xFF422006) else Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
 }
