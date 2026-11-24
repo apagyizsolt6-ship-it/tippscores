@@ -15,6 +15,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import retrofit2.HttpException
 
@@ -34,7 +35,7 @@ class MatchDetailsRepository(
     ): MatchDetails = coroutineScope {
         val statpalStats = async { fetchStatpal(matchId, "live-match-stats", "stats") }
         val statpalEvents = async { fetchStatpal(matchId, "live-plays", "plays") }
-        val statpalLineups = async { fetchStatpal(matchId, "rosters", "lineups") }
+        val statpalLineups = async { fetchLineups(matchId) }
 
         val parsed = MatchDetailsParser.parse(
             statisticsJson = statpalStats.await(),
@@ -205,6 +206,47 @@ class MatchDetailsRepository(
                 }
             }
         }
+    }
+
+    /**
+     * Kezdőcsapat / cserepad. A StatPal "Team Lineups" végpontja (a
+     * /team-lineups, ugyanúgy match_id paraméterrel, mint a predictions és
+     * weather-forecast) előzetes ("projected") és megerősített ("confirmed")
+     * összeállítást is ad. A korábbi rosters / lineups útvonalak tartalékok.
+     * Csak olyan választ fogadunk el, amiben tényleg van játékoslista.
+     */
+    private suspend fun fetchLineups(matchId: String): JsonObject? {
+        val key = statpalKeyProvider().trim()
+        if (key.isEmpty() || matchId.isBlank()) return null
+
+        val urls = listOf(
+            "https://statpal.io/api/v2/soccer/team-lineups?match_id=$matchId",
+            "https://statpal.io/api/v2/soccer/matches/$matchId/team-lineups",
+            "https://statpal.io/api/v2/soccer/matches/$matchId/rosters"
+        )
+
+        for (url in urls) {
+            try {
+                val json = NetworkModule.statpalMatchDetailsApi.getDetails(
+                    url = url,
+                    accessKey = key
+                )
+                if (hasLineupData(json)) return json
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
+    private fun hasLineupData(json: JsonObject): Boolean {
+        val text = json.toString().lowercase()
+        return text.contains("starting_xi") ||
+            text.contains("startxi") ||
+            text.contains("\"starters\"") ||
+            text.contains("\"bench\"") ||
+            text.contains("\"substitutes\"")
     }
 
     private suspend fun fetchStatpal(
