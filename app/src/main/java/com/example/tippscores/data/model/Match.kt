@@ -6,6 +6,9 @@ data class Match(
     val leagueCountry: String,
     val leagueCountryFlag: String = "",
 
+    // StatPal bajnokság-azonosító (tabella és liga-oldal megnyitásához)
+    val leagueId: String? = null,
+
     // -1 = nem alapértelmezett kiemelt bajnokság, 0-4 = az 5 top
     // bajnokság sorindexe.
     val presetOrder: Int = -1,
