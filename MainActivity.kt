@@ -16,6 +16,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,12 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.local.AppDatabase
+import com.example.tippscores.data.local.TipStore
+import com.example.tippscores.data.remote.StatpalImages
+import com.example.tippscores.data.repository.PreviewRepository
+import com.example.tippscores.data.repository.StandingsRepository
+import com.example.tippscores.ui.screens.LeagueScreen
+import com.example.tippscores.ui.screens.TipsScreen
 import com.example.tippscores.data.repository.CoachProfileRepository
 import com.example.tippscores.data.repository.MatchRepository
 import com.example.tippscores.data.repository.TeamProfileRepository
@@ -68,6 +75,22 @@ class MainActivity : ComponentActivity() {
         CoachProfileRepository(
             statpalKeyProvider = { apiPreferences.statpalApiKey }
         )
+    }
+
+    private val previewRepository by lazy {
+        PreviewRepository(
+            statpalKeyProvider = { apiPreferences.statpalApiKey }
+        )
+    }
+
+    private val standingsRepository by lazy {
+        StandingsRepository(
+            statpalKeyProvider = { apiPreferences.statpalApiKey }
+        )
+    }
+
+    private val tipStore by lazy {
+        TipStore(this)
     }
 
     private val detailsRepository by lazy {
@@ -151,6 +174,9 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onCreate(savedInstanceState)
 
+        // A StatPal képek (logó, fotó) az API-kulccsal kérhetők le.
+        StatpalImages.keyProvider = { apiPreferences.statpalApiKey }
+
         // Ha korábban már be volt kapcsolva a gólértesítés, induláskor
         // is biztosítsuk, hogy az ütemezett háttérellenőrzés fusson
         // (pl. újraindítás vagy frissítés után is).
@@ -233,6 +259,36 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf("")
                 }
 
+            var selectedLeagueId by
+                remember {
+                    mutableStateOf<String?>(null)
+                }
+
+            var selectedLeagueName by
+                remember {
+                    mutableStateOf("")
+                }
+
+            var selectedLeagueCountry by
+                remember {
+                    mutableStateOf("")
+                }
+
+            var selectedLeagueFlag by
+                remember {
+                    mutableStateOf("")
+                }
+
+            var showTips by
+                remember {
+                    mutableStateOf(false)
+                }
+
+            // A lejátszott meccsek eredményéből automatikusan kiértékeli a tippeket.
+            LaunchedEffect(matches) {
+                tipStore.settleFrom(matches)
+            }
+
             MaterialTheme(
                 colorScheme =
                     if (darkMode) darkColorScheme() else lightColorScheme()
@@ -247,11 +303,14 @@ class MainActivity : ComponentActivity() {
                     val currentTeamName = selectedTeamName
 
                     val currentCoachId = selectedCoachId
+                    val currentLeagueId = selectedLeagueId
 
                     val screenKey = when {
                         currentCoachId != null -> "coach"
                         currentTeamName != null -> "team"
                         currentMatchId != null -> "match"
+                        currentLeagueId != null -> "league"
+                        showTips -> "tips"
                         else -> "list"
                     }
 
@@ -337,6 +396,10 @@ class MainActivity : ComponentActivity() {
                                 selectedCoachName = coachName
                             },
 
+                            previewRepository = previewRepository,
+
+                            tipStore = tipStore,
+
                             onTeamClick = { teamName, logoUrl ->
                                 // A StatPal csapatprofil azonosítót vár, ezért a
                                 // megnyitott meccsből keressük ki a csapat ID-ját.
@@ -355,6 +418,36 @@ class MainActivity : ComponentActivity() {
 
                                 selectedTeamName = teamName
                                 selectedTeamLogo = logoUrl
+                            }
+                        )
+
+                    } else if (key == "league" && currentLeagueId != null) {
+
+                        LeagueScreen(
+                            leagueId = currentLeagueId,
+                            leagueName = selectedLeagueName,
+                            country = selectedLeagueCountry,
+                            flag = selectedLeagueFlag,
+                            standingsRepository = standingsRepository,
+                            teamRepository = teamProfileRepository,
+                            leagueMatches = matches.filter { it.leagueId == currentLeagueId },
+                            onMatchClick = { matchId ->
+                                selectedMatchId = matchId
+                                matches.find { it.id == matchId }?.let {
+                                    viewModel.openMatchDetails(it)
+                                }
+                            },
+                            onBack = {
+                                selectedLeagueId = null
+                            }
+                        )
+
+                    } else if (key == "tips") {
+
+                        TipsScreen(
+                            tipStore = tipStore,
+                            onBack = {
+                                showTips = false
                             }
                         )
 
@@ -421,6 +514,17 @@ class MainActivity : ComponentActivity() {
                             },
 
                             lastUpdated = lastUpdated,
+
+                            onLeagueClick = { leagueId, leagueName, country, flag ->
+                                selectedLeagueId = leagueId
+                                selectedLeagueName = leagueName
+                                selectedLeagueCountry = country
+                                selectedLeagueFlag = flag
+                            },
+
+                            onOpenTips = {
+                                showTips = true
+                            },
 
                             onMatchClick = { matchId ->
                                 selectedMatchId = matchId
