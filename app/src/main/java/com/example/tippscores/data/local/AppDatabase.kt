@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
 // frissítéskor törlődik és újratöltődik a StatPal-ból), ezért egyszerű
 // destruktív migrációval oldjuk meg a séma bővítését - nincs olyan adat,
 // amit meg kellene őrizni verzióváltáskor.
-@Database(entities = [MatchEntity::class], version = 2, exportSchema = false)
+@Database(entities = [MatchEntity::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun matchDao(): MatchDao
 

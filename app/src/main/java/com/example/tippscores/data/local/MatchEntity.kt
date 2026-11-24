@@ -10,6 +10,7 @@ data class MatchEntity(
     val leagueName: String,
     val leagueCountry: String,
     val leagueCountryFlag: String = "",
+    val leagueId: String? = null,
 
     // -1 = nem alapértelmezett kiemelt bajnokság, 0-4 = az 5 top
     // bajnokság sorindexe (Anglia, Németország, Franciaország,
@@ -44,6 +45,7 @@ fun MatchEntity.toMatch() = Match(
     leagueName = leagueName,
     leagueCountry = leagueCountry,
     leagueCountryFlag = leagueCountryFlag,
+    leagueId = leagueId,
     presetOrder = presetOrder,
     homeTeam = homeTeam,
     homeTeamId = homeTeamId,
