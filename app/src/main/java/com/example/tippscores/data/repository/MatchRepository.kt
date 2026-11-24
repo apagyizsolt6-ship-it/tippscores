@@ -604,6 +604,11 @@ class MatchRepository(
                         leagueCountryFlag =
                             info.flag,
 
+                        leagueId =
+                            league.id
+                                ?.trim()
+                                ?.takeIf { it.isNotEmpty() },
+
                         presetOrder =
                             info.presetOrder,
 

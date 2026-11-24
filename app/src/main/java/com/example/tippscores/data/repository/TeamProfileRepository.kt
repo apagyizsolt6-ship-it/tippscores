@@ -1,6 +1,9 @@
 package com.example.tippscores.data.repository
 
 import com.example.tippscores.data.model.LeagueStats
+import com.example.tippscores.data.model.TeamFormItem
+import com.example.tippscores.data.model.TeamRecentMatch
+import com.example.tippscores.data.util.JsonX
 import com.example.tippscores.data.model.LeaguePlayerStat
 import com.example.tippscores.data.model.TeamLeagueRecord
 import com.example.tippscores.data.model.TeamMinuteBucket
@@ -55,7 +58,7 @@ class TeamProfileRepository(
                 url = "https://statpal.io/api/v2/soccer/teams/$id",
                 accessKey = key
             )
-            val profile = parse(root, id, teamName)
+            val profile = parse(root, id, teamName)?.let { withRecent(it, id, teamName, key) }
             if (profile != null) {
                 cache[id] = CacheEntry(System.currentTimeMillis(), profile)
             }
@@ -66,6 +69,132 @@ class TeamProfileRepository(
             e.printStackTrace()
             null
         }
+    }
+
+    /**
+     * A csapat utolsó lejátszott mérkőzései (forma + utolsó 5 meccs).
+     * A StatPal "Get Matches Recent / Upcoming" végpontjának csapatra
+     * szűrt változatát próbáljuk; ha egyik cím sem ad használható
+     * választ, a profil változatlanul, forma nélkül jelenik meg.
+     */
+    private suspend fun withRecent(
+        profile: TeamProfile,
+        teamId: String,
+        teamName: String,
+        key: String
+    ): TeamProfile {
+        val urls = listOf(
+            "https://statpal.io/api/v2/soccer/matches/recent?team_id=$teamId",
+            "https://statpal.io/api/v2/soccer/teams/$teamId/matches"
+        )
+        for (url in urls) {
+            try {
+                val json = NetworkModule.statpalMatchDetailsApi.getDetails(
+                    url = url,
+                    accessKey = key
+                )
+                val (form, recent) = parseRecent(json, teamId, profile.name.ifBlank { teamName })
+                if (recent.isNotEmpty()) {
+                    return profile.copy(form = form, recentMatches = recent)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+        return profile
+    }
+
+    private fun parseRecent(
+        root: JsonObject,
+        teamId: String,
+        teamName: String
+    ): Pair<List<TeamFormItem>, List<TeamRecentMatch>> {
+
+        class Game(
+            val dateKey: Int,
+            val date: String,
+            val home: String,
+            val away: String,
+            val homeGoals: Int,
+            val awayGoals: Int,
+            val teamIsHome: Boolean
+        )
+
+        val games = mutableListOf<Game>()
+
+        JsonX.walkObjects(root) { o ->
+            val home = JsonX.obj(o.get("home"))
+            val away = JsonX.obj(o.get("away"))
+            if (home == null || away == null) return@walkObjects
+
+            val status = JsonX.text(o, "status")?.uppercase().orEmpty()
+            if (status !in FINISHED_STATUSES) return@walkObjects
+
+            val homeGoals = JsonX.toInt(JsonX.text(home, "goals")) ?: return@walkObjects
+            val awayGoals = JsonX.toInt(JsonX.text(away, "goals")) ?: return@walkObjects
+            val homeName = JsonX.text(home, "name", "team_name") ?: return@walkObjects
+            val awayName = JsonX.text(away, "name", "team_name") ?: return@walkObjects
+
+            val homeId = JsonX.text(home, "id", "team_id")
+            val awayId = JsonX.text(away, "id", "team_id")
+
+            val normalizedTeam = JsonX.norm(teamName)
+            val isHome = homeId == teamId ||
+                (homeId == null && JsonX.norm(homeName) == normalizedTeam)
+            val isAway = awayId == teamId ||
+                (awayId == null && JsonX.norm(awayName) == normalizedTeam)
+            if (!isHome && !isAway) return@walkObjects
+
+            val date = JsonX.text(o, "date").orEmpty()
+            games += Game(
+                dateKey = JsonX.dateKey(date),
+                date = date,
+                home = homeName,
+                away = awayName,
+                homeGoals = homeGoals,
+                awayGoals = awayGoals,
+                teamIsHome = isHome
+            )
+        }
+
+        val last = games
+            .distinctBy { "${it.dateKey}|${it.home}|${it.away}" }
+            .sortedByDescending { it.dateKey }
+            .take(5)
+
+        fun resultOf(game: Game): String {
+            val own = if (game.teamIsHome) game.homeGoals else game.awayGoals
+            val other = if (game.teamIsHome) game.awayGoals else game.homeGoals
+            return when {
+                own > other -> "GY"
+                own < other -> "V"
+                else -> "D"
+            }
+        }
+
+        val form = last.map { game ->
+            TeamFormItem(
+                result = resultOf(game),
+                label = if (game.teamIsHome) "Hazai" else "Idegenben",
+                score = "${game.homeGoals} – ${game.awayGoals}",
+                opponent = if (game.teamIsHome) game.away else game.home
+            )
+        }
+
+        val recent = last.map { game ->
+            TeamRecentMatch(
+                date = game.date,
+                opponent = if (game.teamIsHome) game.away else game.home,
+                homeTeam = game.home,
+                awayTeam = game.away,
+                homeScore = game.homeGoals.toString(),
+                awayScore = game.awayGoals.toString(),
+                result = resultOf(game)
+            )
+        }
+
+        return form to recent
     }
 
     /**
@@ -307,5 +436,8 @@ class TeamProfileRepository(
     private companion object {
         const val CACHE_MS = 10 * 60 * 1000L
         const val LEAGUE_CACHE_MS = 30 * 60 * 1000L
+        val FINISHED_STATUSES = setOf(
+            "FT", "AET", "PEN", "AP", "FINISHED", "FULLTIME", "FULL TIME", "ENDED"
+        )
     }
 }

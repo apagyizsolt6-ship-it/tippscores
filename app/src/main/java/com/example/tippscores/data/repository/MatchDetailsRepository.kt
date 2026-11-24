@@ -11,6 +11,7 @@ import com.example.tippscores.data.model.PlayerProfile
 import com.example.tippscores.data.model.PlayerTransfer
 import com.example.tippscores.data.model.TeamTrophy
 import com.example.tippscores.data.remote.NetworkModule
+import com.example.tippscores.data.util.TtlCache
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -18,6 +19,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import retrofit2.HttpException
+
+private const val LINEUP_TTL_MS = 2 * 60 * 1000L
+private const val SLOW_TTL_MS = 30 * 60 * 1000L
 
 /**
  * Mérkőzés részletek – csak StatPal.
@@ -33,9 +37,20 @@ class MatchDetailsRepository(
         homeTeamId: String? = null,
         awayTeamId: String? = null
     ): MatchDetails = coroutineScope {
-        val statpalStats = async { fetchStatpal(matchId, "live-match-stats", "stats") }
-        val statpalEvents = async { fetchStatpal(matchId, "live-plays", "plays") }
-        val statpalLineups = async { fetchLineups(matchId) }
+        val statpalStats = async {
+            fetchWithQueryFallback(
+                matchId, "live-match-stats", "stats", "live-match-stats"
+            ) { hasStatsData(it) }
+        }
+        val statpalEvents = async {
+            fetchWithQueryFallback(
+                matchId, "live-plays", "plays", "live-plays"
+            ) { hasEventData(it) }
+        }
+        val statpalLineups = async {
+            // A megerősített összeállítás ritkán változik: 2 percig gyorsítótárazzuk.
+            cached("lineups:$matchId", LINEUP_TTL_MS) { fetchLineups(matchId) }
+        }
 
         val parsed = MatchDetailsParser.parse(
             statisticsJson = statpalStats.await(),
@@ -45,9 +60,17 @@ class MatchDetailsRepository(
             awayTeam = awayTeam
         )
 
-        val h2h = async { fetchHeadToHead(homeTeamId, awayTeamId) }
-        val prediction = async { fetchPrediction(matchId) }
-        val weather = async { fetchWeather(matchId) }
+        val h2h = async {
+            cached("h2h:$homeTeamId:$awayTeamId", SLOW_TTL_MS) {
+                fetchHeadToHead(homeTeamId, awayTeamId).takeIf { it.isNotEmpty() }
+            }.orEmpty()
+        }
+        val prediction = async {
+            cached("prediction:$matchId", SLOW_TTL_MS) { fetchPrediction(matchId) }
+        }
+        val weather = async {
+            cached("weather:$matchId", SLOW_TTL_MS) { fetchWeather(matchId) }
+        }
 
         MatchDetails(
             statistics = parsed.statistics,
@@ -72,6 +95,11 @@ class MatchDetailsRepository(
     suspend fun fetchPlayerProfile(playerId: String): PlayerProfile? {
         val key = statpalKeyProvider().trim()
         if (key.isEmpty() || playerId.isBlank()) return null
+
+        return cached("player:$playerId", SLOW_TTL_MS) { loadPlayerProfile(playerId, key) }
+    }
+
+    private suspend fun loadPlayerProfile(playerId: String, key: String): PlayerProfile? {
 
         return try {
             val root = NetworkModule.statpalMatchDetailsApi.getDetails(
@@ -247,6 +275,64 @@ class MatchDetailsRepository(
             text.contains("\"starters\"") ||
             text.contains("\"bench\"") ||
             text.contains("\"substitutes\"")
+    }
+
+    private val responseCache = TtlCache<Any>(maxEntries = 120)
+
+    /** Közös, lejárati idős gyorsítótár: csak a nem üres eredményeket tartjuk meg. */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T : Any> cached(
+        key: String,
+        ttlMs: Long,
+        loader: suspend () -> T?
+    ): T? {
+        val hit = responseCache.get(key, ttlMs)
+        if (hit != null) return hit as T
+        val value = loader() ?: return null
+        responseCache.put(key, value)
+        return value
+    }
+
+    /**
+     * Először a megszokott `matches/{id}/{resource}` címet próbálja, és ha
+     * az nem ad használható adatot, a `{resource}?match_id={id}` formát is
+     * (a StatPal többi végpontja is így működik).
+     */
+    private suspend fun fetchWithQueryFallback(
+        matchId: String,
+        resource1: String,
+        resource2: String,
+        queryResource: String,
+        isUsable: (JsonObject) -> Boolean
+    ): JsonObject? {
+        val primary = fetchStatpal(matchId, resource1, resource2)
+        if (primary != null && isUsable(primary)) return primary
+
+        val key = statpalKeyProvider().trim()
+        if (key.isEmpty()) return primary
+
+        val alternative = try {
+            NetworkModule.statpalMatchDetailsApi.getDetails(
+                url = "https://statpal.io/api/v2/soccer/$queryResource?match_id=$matchId",
+                accessKey = key
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+
+        return if (alternative != null && isUsable(alternative)) alternative else primary
+    }
+
+    private fun hasStatsData(json: JsonObject): Boolean {
+        val text = json.toString().lowercase()
+        return text.contains("possession") || text.contains("shots") || text.contains("corner")
+    }
+
+    private fun hasEventData(json: JsonObject): Boolean {
+        val text = json.toString().lowercase()
+        return text.contains("minute") || text.contains("\"min\"") || text.contains("player")
     }
 
     private suspend fun fetchStatpal(
