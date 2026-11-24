@@ -43,7 +43,9 @@ import com.example.tippscores.data.model.TeamLeagueRecord
 import com.example.tippscores.data.model.TeamMinuteBucket
 import com.example.tippscores.data.model.TeamProfile
 import com.example.tippscores.data.model.TeamSquadPlayer
+import com.example.tippscores.data.remote.StatpalImages
 import com.example.tippscores.data.repository.TeamProfileRepository
+import com.example.tippscores.ui.components.RemoteImage
 import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
 
@@ -130,6 +132,7 @@ fun TeamProfileScreen(
         ) {
             item {
                 ProfileHeader(
+                    teamId = profile?.id ?: teamId,
                     name = profile?.name ?: teamName,
                     logoUrl = profile?.logoUrl?.takeIf { it.isNotBlank() } ?: fallbackLogoUrl,
                     country = profile?.country,
@@ -725,6 +728,7 @@ private fun InfoRow(
 
 @Composable
 private fun ProfileHeader(
+    teamId: String?,
     name: String,
     logoUrl: String,
     country: String?,
@@ -743,18 +747,15 @@ private fun ProfileHeader(
                 .padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (logoUrl.isNotBlank()) {
-                AsyncImage(
-                    model = logoUrl,
-                    contentDescription = "$name logó",
-                    modifier = Modifier
-                        .size(82.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                Text("⚽", fontSize = 52.sp)
-            }
+            RemoteImage(
+                url = logoUrl.takeIf { it.isNotBlank() } ?: StatpalImages.team(teamId),
+                contentDescription = "$name logó",
+                modifier = Modifier
+                    .size(82.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Fit,
+                fallback = { Text("⚽", fontSize = 52.sp) }
+            )
             Spacer(Modifier.height(10.dp))
             Text(name, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, textAlign = TextAlign.Center)
             val subtitle = listOfNotNull(

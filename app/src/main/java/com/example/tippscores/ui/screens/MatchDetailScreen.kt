@@ -36,6 +36,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,7 +69,14 @@ import com.example.tippscores.data.model.HeadToHeadMatch
 import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.data.model.PlayerProfile
 import com.example.tippscores.data.repository.MatchDetailsRepository
+import com.example.tippscores.data.local.Tip
+import com.example.tippscores.data.local.TipStore
+import com.example.tippscores.data.model.MatchPreview
+import com.example.tippscores.data.repository.PreviewRepository
+import com.example.tippscores.ui.components.EventTimeline
 import com.example.tippscores.ui.components.FullPitchLineupCard
+import com.example.tippscores.ui.components.PreviewSection
+import com.example.tippscores.ui.components.TipSection
 import com.example.tippscores.ui.theme.LocalAppColors
 import java.util.Locale
 
@@ -85,10 +93,43 @@ fun MatchDetailScreen(
     onToggleFavorite: (String) -> Unit,
     onToggleFollowTeam: (String) -> Unit,
     onTeamClick: (String, String) -> Unit,
-    onCoachClick: (String, String) -> Unit = { _, _ -> }
+    onCoachClick: (String, String) -> Unit = { _, _ -> },
+    previewRepository: PreviewRepository? = null,
+    tipStore: TipStore? = null,
+    onTipsChanged: () -> Unit = {}
 ) {
     val colors = LocalAppColors.current
     var selectedTab by remember { mutableIntStateOf(0) }
+
+    // "Előzetes" fül: sztorik, modell-tipp, szorzók, időjárás (csak megnyitáskor töltődik).
+    var preview by remember(match?.id) { mutableStateOf<MatchPreview?>(null) }
+    var previewLoading by remember(match?.id) { mutableStateOf(false) }
+
+    LaunchedEffect(match?.id, selectedTab) {
+        if (selectedTab == 3 && match != null && preview == null && previewRepository != null) {
+            previewLoading = true
+            preview = try {
+                previewRepository.fetch(match.id, match.isLive)
+            } catch (e: Exception) {
+                null
+            }
+            previewLoading = false
+        }
+    }
+
+    // "Tipp" fül: saját tipp + automatikus kiértékelés a végeredmény után.
+    var tipVersion by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(match?.id, match?.status, match?.homeScore, match?.awayScore) {
+        if (match != null && tipStore != null && tipStore.settleFrom(listOf(match))) {
+            tipVersion++
+            onTipsChanged()
+        }
+    }
+
+    val currentTip = remember(match?.id, tipVersion) {
+        match?.let { tipStore?.get(it.id) }
+    }
 
     // Kártyán megnyitott játékos (pálya nézetben rákoppintva).
     var selectedPlayer by remember { mutableStateOf<LineupPlayer?>(null) }
@@ -237,12 +278,13 @@ fun MatchDetailScreen(
             }
 
             item {
-            TabRow(
+            ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = colors.cardBackground,
-                    contentColor = Color(0xFF2563EB)
+                    contentColor = Color(0xFF2563EB),
+                    edgePadding = 0.dp
                 ) {
-                    listOf("Statisztika", "Események", "Összeállítás", "H2H").forEachIndexed { index, title ->
+                    listOf("Statisztika", "Események", "Összeállítás", "Előzetes", "Tipp", "H2H").forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
@@ -258,7 +300,7 @@ fun MatchDetailScreen(
                 }
             }
 
-            if (detailsLoading) {
+            if (detailsLoading && selectedTab != 3 && selectedTab != 4) {
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -282,7 +324,7 @@ fun MatchDetailScreen(
                         }
                     }
                 }
-            } else if (detailsError != null) {
+            } else if (detailsError != null && selectedTab != 3 && selectedTab != 4) {
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -325,14 +367,16 @@ fun MatchDetailScreen(
                     }
 
                     1 -> {
-                        items(
-                            items = details?.events.orEmpty(),
-                            key = { "${it.minute}-${it.player}-${it.type}" }
-                        ) { event ->
-                            EventRow(event)
-                        }
                         if (details?.events.isNullOrEmpty()) {
                             item { EmptyDetailsCard("Még nincsenek események (gól, lap, csere).") }
+                        } else {
+                            item {
+                                EventTimeline(
+                                    events = details?.events.orEmpty(),
+                                    homeTeam = match.homeTeam,
+                                    awayTeam = match.awayTeam
+                                )
+                            }
                         }
                     }
 
@@ -393,6 +437,49 @@ fun MatchDetailScreen(
                     }
 
                     3 -> {
+                        item {
+                            PreviewSection(
+                                preview = preview,
+                                loading = previewLoading,
+                                injuries = details?.injuries.orEmpty()
+                            )
+                        }
+                    }
+
+                    4 -> {
+                        item {
+                            if (tipStore == null) {
+                                EmptyDetailsCard("A tippjáték jelenleg nem érhető el.")
+                            } else {
+                                TipSection(
+                                    match = match,
+                                    tip = currentTip,
+                                    onSave = { predictedHome, predictedAway ->
+                                        tipStore.save(
+                                            Tip(
+                                                matchId = match.id,
+                                                homeTeam = match.homeTeam,
+                                                awayTeam = match.awayTeam,
+                                                league = match.leagueName,
+                                                predictedHome = predictedHome,
+                                                predictedAway = predictedAway,
+                                                createdAt = System.currentTimeMillis()
+                                            )
+                                        )
+                                        tipVersion++
+                                        onTipsChanged()
+                                    },
+                                    onDelete = {
+                                        tipStore.remove(match.id)
+                                        tipVersion++
+                                        onTipsChanged()
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    5 -> {
                         item {
                             HeadToHeadSection(
                                 matches = details?.headToHead.orEmpty(),

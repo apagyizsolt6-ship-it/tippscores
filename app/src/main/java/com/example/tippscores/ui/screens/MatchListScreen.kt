@@ -120,7 +120,9 @@ fun MatchListScreen(
     onDarkModeChange: (Boolean) -> Unit,
     onGoalNotificationsChange: (Boolean) -> Unit,
     onMatchClick: (String) -> Unit,
-    lastUpdated: String? = null
+    lastUpdated: String? = null,
+    onLeagueClick: (String, String, String, String) -> Unit = { _, _, _, _ -> },
+    onOpenTips: () -> Unit = {}
 ) {
 
     val colors = LocalAppColors.current
@@ -411,6 +413,10 @@ fun MatchListScreen(
                                 fontWeight =
                                     FontWeight.Bold
                             )
+                        }
+
+                        IconButton(onClick = onOpenTips) {
+                            Text("🎯", fontSize = 18.sp)
                         }
 
                         IconButton(
@@ -1277,7 +1283,22 @@ fun MatchListScreen(
                                                 matchGroup.first().presetOrder >= 0,
                                                 leagueFeatured
                                             )
-                                        }
+                                        },
+
+                                        onOpenLeague =
+                                            matchGroup
+                                                .first()
+                                                .leagueId
+                                                ?.let { leagueId ->
+                                                    {
+                                                        onLeagueClick(
+                                                            leagueId,
+                                                            matchGroup.first().leagueName,
+                                                            matchGroup.first().leagueCountry,
+                                                            matchGroup.first().leagueCountryFlag
+                                                        )
+                                                    }
+                                                }
                                     )
                                 }
 

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
@@ -26,13 +27,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tippscores.data.model.CoachProfile
+import com.example.tippscores.data.remote.StatpalImages
 import com.example.tippscores.data.repository.CoachProfileRepository
+import com.example.tippscores.ui.components.RemoteImage
 import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
 
@@ -94,6 +99,7 @@ fun CoachProfileScreen(
         ) {
             item {
                 CoachHeader(
+                    imageUrl = StatpalImages.coach(coachId),
                     name = profile?.name ?: coachName,
                     subtitle = listOfNotNull(
                         profile?.team?.takeIf { it.isNotBlank() },
@@ -217,7 +223,12 @@ fun CoachProfileScreen(
 }
 
 @Composable
-private fun CoachHeader(name: String, subtitle: String, colors: AppColorScheme) {
+private fun CoachHeader(
+    imageUrl: String?,
+    name: String,
+    subtitle: String,
+    colors: AppColorScheme
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -229,7 +240,15 @@ private fun CoachHeader(name: String, subtitle: String, colors: AppColorScheme) 
                 .padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("🧑‍💼", fontSize = 52.sp)
+            RemoteImage(
+                url = imageUrl,
+                contentDescription = "$name fotója",
+                modifier = Modifier
+                    .size(82.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                fallback = { Text("🧑‍💼", fontSize = 52.sp) }
+            )
             Spacer(Modifier.height(10.dp))
             Text(
                 name,
