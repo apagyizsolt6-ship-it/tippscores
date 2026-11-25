@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -70,6 +71,20 @@ fun PreviewSection(
             return@Column
         }
 
+        val rivalry = preview?.rivalry
+        if (rivalry != null) {
+            Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFFEE2E2)) {
+                Text(
+                    "🔥 $rivalry",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    color = Color(0xFF991B1B),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
         val prediction = preview?.prediction
         if (prediction != null) {
             PreviewCard("Modell-tipp", colors) {
@@ -93,8 +108,12 @@ fun PreviewSection(
                         }
                     }
                 }
-                prediction.market?.let {
-                    Text("Piac: $it", color = colors.tertiaryText, fontSize = 10.sp)
+
+                val marketLine = listOfNotNull(prediction.market, prediction.selection)
+                    .joinToString(" • ")
+                if (marketLine.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text("Piaci szorzó: $marketLine", color = colors.tertiaryText, fontSize = 10.sp)
                 }
                 if (!prediction.reasoning.isNullOrBlank()) {
                     Spacer(Modifier.height(8.dp))
@@ -135,11 +154,17 @@ fun PreviewSection(
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
+                val where = listOfNotNull(weather.place, weather.localTime).joinToString(" • ")
+                if (where.isNotBlank()) {
+                    Text(where, color = colors.tertiaryText, fontSize = 10.sp)
+                }
                 val details = listOfNotNull(
                     weather.feelsLike?.let { "érzet: $it" },
                     weather.wind?.let { "szél: $it" },
-                    weather.rainChance?.let { "eső: $it" },
-                    weather.humidity?.let { "páratartalom: $it" }
+                    weather.rainChance?.let { "eső esélye: $it" },
+                    weather.humidity?.let { "páratartalom: $it" },
+                    weather.cloudCover?.let { "felhőzet: $it" },
+                    weather.uvIndex?.let { "UV: $it" }
                 ).joinToString("   ")
                 if (details.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
@@ -166,15 +191,36 @@ fun PreviewSection(
         if (stories.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PreviewCard("Háttér és sztorik", colors) {
+                var lastSection: String? = null
+
                 stories.forEachIndexed { index, story ->
-                    if (index > 0) Spacer(Modifier.height(10.dp))
-                    story.title?.let {
-                        Text(it, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    if (story.section != lastSection) {
+                        if (index > 0) Spacer(Modifier.height(12.dp))
+                        Text(
+                            story.section,
+                            color = Accent,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 12.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        lastSection = story.section
+                    } else {
+                        Spacer(Modifier.height(8.dp))
                     }
-                    Text(story.text, color = colors.secondaryText, fontSize = 12.sp)
-                    val meta = listOfNotNull(story.date, story.tag).joinToString(" • ")
-                    if (meta.isNotBlank()) {
-                        Text(meta, color = colors.tertiaryText, fontSize = 10.sp)
+
+                    if (story.isQuote) {
+                        Text(
+                            "„${story.text}”",
+                            color = colors.secondaryText,
+                            fontStyle = FontStyle.Italic,
+                            fontSize = 12.sp
+                        )
+                        val who = listOfNotNull(story.speaker, story.context).joinToString(" • ")
+                        if (who.isNotBlank()) {
+                            Text("— $who", color = colors.tertiaryText, fontSize = 10.sp)
+                        }
+                    } else {
+                        Text(story.text, color = colors.secondaryText, fontSize = 12.sp)
                     }
                 }
             }
