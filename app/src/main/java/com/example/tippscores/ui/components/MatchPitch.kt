@@ -13,16 +13,25 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,7 +46,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.tippscores.data.model.LineupPlayer
 import com.example.tippscores.data.model.MatchEvent
 import com.example.tippscores.data.model.MatchLineup
@@ -57,9 +65,11 @@ private val KeeperColor = Color(0xFFF59E0B)
 
 /**
  * Egyetlen pályán mutatja mindkét csapat kezdőcsapatát (hazai felül,
- * vendég alul), a formációkkal, a gól / lap jelzésekkel a játékosokon,
- * az edzőkkel és a cserepadokkal.
+ * vendég alul), a formációkkal, a kapcsolható hőtérképpel, a gól /
+ * gólpassz / lap / csere jelzésekkel a játékosokon, az interaktív
+ * gyors-kártyával, az edzőkkel és a cserepadokkal.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullPitchLineupCard(
     homeTeam: String,
@@ -72,11 +82,28 @@ fun FullPitchLineupCard(
 ) {
     val colors = LocalAppColors.current
 
+    var showHeatMap by remember { mutableStateOf(false) }
+    var selectedPlayerState by remember { mutableStateOf<Triple<LineupPlayer, String, PlayerBadges>?>(null) }
+
     val homeRows = remember(home) { buildRows(home) }
     val awayRows = remember(away) { buildRows(away) }
 
     val homeBadges = remember(home, events) { badgesFor(home, events, homeTeam, true) }
     val awayBadges = remember(away, events) { badgesFor(away, events, awayTeam, false) }
+
+    selectedPlayerState?.let { (player, teamName, badges) ->
+        PlayerQuickMatchSheet(
+            player = player,
+            teamName = teamName,
+            badges = badges,
+            colors = colors,
+            onDismiss = { selectedPlayerState = null },
+            onOpenFullProfile = {
+                selectedPlayerState = null
+                onPlayerClick(player, teamName)
+            }
+        )
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -97,7 +124,19 @@ fun FullPitchLineupCard(
                     colors = colors,
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = showHeatMap,
+                    onClick = { showHeatMap = !showHeatMap },
+                    label = {
+                        Text(
+                            text = if (showHeatMap) "🔥 Hőtérkép: BE" else "🔥 Hőtérkép",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                )
+                Spacer(Modifier.width(8.dp))
                 TeamHeader(
                     name = awayTeam,
                     formation = away.formation,
@@ -134,25 +173,35 @@ fun FullPitchLineupCard(
             ) {
                 PitchBackground()
 
-                Column(modifier = Modifier.fillMaxSize()) {
+                if (showHeatMap) {
+                    PitchHeatMapLayer(
+                        homeRows = homeRows,
+                        awayRows = awayRows.asReversed(),
+                        homeBadges = homeBadges,
+                        awayBadges = awayBadges
+                    )
+                }
 
-                    // Hazai: kapus fent, támadók a középvonal felé.
+                Column(modifier = Modifier.fillMaxSize()) {
                     PitchHalf(
                         rows = homeRows,
                         baseColor = HomeColor,
                         badges = homeBadges,
                         emptyText = "$homeTeam: nincs kezdőcsapat",
-                        onPlayerClick = { onPlayerClick(it, homeTeam) },
+                        onPlayerClick = { p ->
+                            selectedPlayerState = Triple(p, homeTeam, homeBadges[p] ?: PlayerBadges())
+                        },
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Vendég: támadók a középvonal felől, kapus legalul.
                     PitchHalf(
                         rows = awayRows.asReversed(),
                         baseColor = AwayColor,
                         badges = awayBadges,
                         emptyText = "$awayTeam: nincs kezdőcsapat",
-                        onPlayerClick = { onPlayerClick(it, awayTeam) },
+                        onPlayerClick = { p ->
+                            selectedPlayerState = Triple(p, awayTeam, awayBadges[p] ?: PlayerBadges())
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -164,9 +213,163 @@ fun FullPitchLineupCard(
             CoachLine(homeTeam, home, HomeColor, colors, onCoachClick)
             CoachLine(awayTeam, away, AwayColor, colors, onCoachClick)
 
-            BenchSection(homeTeam, home, HomeColor, colors) { onPlayerClick(it, homeTeam) }
-            BenchSection(awayTeam, away, AwayColor, colors) { onPlayerClick(it, awayTeam) }
+            BenchSection(homeTeam, home, HomeColor, homeBadges, colors) { p ->
+                selectedPlayerState = Triple(p, homeTeam, homeBadges[p] ?: PlayerBadges())
+            }
+            BenchSection(awayTeam, away, AwayColor, awayBadges, colors) { p ->
+                selectedPlayerState = Triple(p, awayTeam, awayBadges[p] ?: PlayerBadges())
+            }
         }
+    }
+}
+
+// ================================================================
+// GYORS JÁTÉKOS MECCS-KÁRTYA (BOTTOM SHEET)
+// ================================================================
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerQuickMatchSheet(
+    player: LineupPlayer,
+    teamName: String,
+    badges: PlayerBadges,
+    colors: AppColorScheme,
+    onDismiss: () -> Unit,
+    onOpenFullProfile: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colors.cardBackground
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val imageUrl = player.photoUrl?.takeIf { it.isNotBlank() }
+                    ?: StatpalImages.player(player.id)
+
+                RemoteImage(
+                    url = imageUrl,
+                    contentDescription = player.name,
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, HomeColor, CircleShape),
+                    contentScale = ContentScale.Crop,
+                    fallback = {
+                        NumberCircle(
+                            number = player.number,
+                            fill = HomeColor,
+                            isKeeper = roleOf(player.position) == 0
+                        )
+                    }
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = buildString {
+                            if (!player.number.isNullOrBlank()) append("#${player.number} ")
+                            append(player.name)
+                            if (player.isCaptain) append(" (C)")
+                        },
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = "$teamName • ${positionLabel(player.position)}",
+                        color = colors.secondaryText,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            HorizontalDivider(color = colors.divider)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                QuickStatPill("⚽ Gól", "${badges.goals}", colors)
+                QuickStatPill("👟 Gólpassz", "${badges.assists}", colors)
+                QuickStatPill("🟨 Sárga", "${badges.yellow}", colors)
+                QuickStatPill("🟥 Piros", "${badges.red}", colors)
+                QuickStatPill("⏱ Csere", badges.subMinute?.let { "$it'" } ?: "–", colors)
+            }
+
+            Button(
+                onClick = onOpenFullProfile,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = HomeColor)
+            ) {
+                Text(
+                    "Teljes játékos profil megnyitása",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun QuickStatPill(label: String, value: String, colors: AppColorScheme) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+        Text(label, color = colors.tertiaryText, fontSize = 10.sp)
+    }
+}
+
+// ================================================================
+// HŐTÉRKÉP RÉTEG
+// ================================================================
+
+@Composable
+private fun PitchHeatMapLayer(
+    homeRows: List<List<LineupPlayer>>,
+    awayRows: List<List<LineupPlayer>>,
+    homeBadges: Map<LineupPlayer, PlayerBadges>,
+    awayBadges: Map<LineupPlayer, PlayerBadges>
+) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val halfH = size.height / 2f
+
+        fun drawHalfHeat(rows: List<List<LineupPlayer>>, topY: Float, badges: Map<LineupPlayer, PlayerBadges>) {
+            if (rows.isEmpty()) return
+            val rowStep = halfH / (rows.size + 1)
+            rows.forEachIndexed { rIdx, row ->
+                val y = topY + rowStep * (rIdx + 1)
+                val colStep = size.width / (row.size + 1)
+                row.forEachIndexed { cIdx, player ->
+                    val x = colStep * (cIdx + 1)
+                    val b = badges[player]
+                    val boost = 1f + ((b?.goals ?: 0) * 0.25f) + ((b?.assists ?: 0) * 0.15f)
+                    val radius = (size.width * 0.16f * boost).coerceAtMost(size.width * 0.26f)
+
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFFF3D00).copy(alpha = 0.45f),
+                                Color(0xFFFFEA00).copy(alpha = 0.24f),
+                                Color.Transparent
+                            ),
+                            center = Offset(x, y),
+                            radius = radius
+                        ),
+                        radius = radius,
+                        center = Offset(x, y)
+                    )
+                }
+            }
+        }
+
+        drawHalfHeat(homeRows, 0f, homeBadges)
+        drawHalfHeat(awayRows, halfH, awayBadges)
     }
 }
 
@@ -215,7 +418,7 @@ private fun TeamHeader(
 @Composable
 private fun Legend(colors: AppColorScheme) {
     Text(
-        "⚽ gól   🟨 sárga lap   🟥 piros lap   Ⓒ csapatkapitány",
+        "⚽ gól   👟 gólpassz   🟨/🟥 lap   🔻/🔺 csere   Ⓒ kapitány",
         color = colors.tertiaryText,
         fontSize = 10.sp,
         textAlign = TextAlign.Center,
@@ -242,11 +445,7 @@ private fun CoachLine(
     ) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(teamColor))
         Spacer(Modifier.width(6.dp))
-        Text(
-            "$teamName – edző: ",
-            color = colors.secondaryText,
-            fontSize = 11.sp
-        )
+        Text("$teamName – edző: ", color = colors.secondaryText, fontSize = 11.sp)
         if (coachId != null) {
             Text(
                 "$coach ›",
@@ -266,6 +465,7 @@ private fun BenchSection(
     teamName: String,
     lineup: MatchLineup,
     teamColor: Color,
+    badges: Map<LineupPlayer, PlayerBadges>,
     colors: AppColorScheme,
     onPlayerClick: (LineupPlayer) -> Unit
 ) {
@@ -287,6 +487,7 @@ private fun BenchSection(
     }
 
     lineup.substitutePlayers.forEach { player ->
+        val b = badges[player]
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -308,6 +509,21 @@ private fun BenchSection(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 12.sp
             )
+            if (b != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 6.dp)
+                ) {
+                    if (b.subbedIn && b.subMinute != null) {
+                        Text("🔺${b.subMinute}'", fontSize = 10.sp, color = Color(0xFF16A34A), fontWeight = FontWeight.Bold)
+                    }
+                    if (b.goals > 0) Text("⚽${if (b.goals > 1) b.goals else ""}", fontSize = 10.sp)
+                    if (b.assists > 0) Text("👟", fontSize = 10.sp)
+                    if (b.yellow > 0) Text("🟨", fontSize = 10.sp)
+                    if (b.red > 0) Text("🟥", fontSize = 10.sp)
+                }
+            }
             Text(positionLabel(player.position), color = colors.tertiaryText, fontSize = 10.sp)
         }
     }
@@ -320,8 +536,6 @@ private fun BenchSection(
 @Composable
 private fun PitchBackground() {
     Canvas(modifier = Modifier.fillMaxSize()) {
-
-        // Fűcsíkok
         val stripes = 12
         val stripeHeight = size.height / stripes
         for (i in 0 until stripes) {
@@ -338,7 +552,6 @@ private fun PitchBackground() {
         val w = size.width
         val h = size.height
 
-        // Külső vonal + középvonal + középkör + középpont
         drawRect(
             color = lineColor,
             topLeft = Offset(margin, margin),
@@ -349,7 +562,6 @@ private fun PitchBackground() {
         drawCircle(lineColor, radius = w * 0.14f, center = Offset(w / 2f, h / 2f), style = stroke)
         drawCircle(lineColor, radius = 3.dp.toPx(), center = Offset(w / 2f, h / 2f))
 
-        // Tizenhatosok és kapuelőterek (fent és lent)
         val boxW = w * 0.58f
         val boxH = h * 0.15f
         val sixW = w * 0.28f
@@ -424,11 +636,10 @@ private fun PitchMarker(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(62.dp)
+            .width(64.dp)
             .clickable(onClick = onClick)
     ) {
-        Box(modifier = Modifier.size(38.dp)) {
-
+        Box(modifier = Modifier.size(40.dp)) {
             val imageUrl = player.photoUrl?.takeIf { it.isNotBlank() }
                 ?: StatpalImages.player(player.id)
 
@@ -465,12 +676,39 @@ private fun PitchMarker(
                 }
             }
 
-            if (badges.goals > 0) {
-                Text(
-                    text = if (badges.goals > 1) "⚽${badges.goals}" else "⚽",
-                    fontSize = 10.sp,
-                    modifier = Modifier.align(Alignment.TopStart)
-                )
+            if (badges.goals > 0 || badges.assists > 0) {
+                Row(modifier = Modifier.align(Alignment.TopStart)) {
+                    if (badges.goals > 0) {
+                        Text(
+                            text = if (badges.goals > 1) "⚽${badges.goals}" else "⚽",
+                            fontSize = 10.sp
+                        )
+                    }
+                    if (badges.assists > 0) {
+                        Text(
+                            text = if (badges.assists > 1) "👟${badges.assists}" else "👟",
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+
+            if (badges.subbedOut) {
+                Surface(
+                    color = Color(0xCC000000),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = (-4).dp)
+                ) {
+                    Text(
+                        text = "🔻${badges.subMinute ?: ""}'",
+                        color = Color(0xFFFCA5A5),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 2.dp)
+                    )
+                }
             }
 
             val cards = buildString {
@@ -504,10 +742,9 @@ private fun PitchMarker(
 }
 
 // ================================================================
-// SORBA RENDEZÉS (kapus -> védők -> középpályások -> támadók)
+// SORBA RENDEZÉS
 // ================================================================
 
-/** 0 = kapus, 1 = védő, 2 = középpályás, 3 = támadó, 4 = ismeretlen. */
 private fun roleOf(position: String?): Int {
     val p = position?.trim()?.lowercase(Locale.ROOT).orEmpty()
     return when {
@@ -530,11 +767,6 @@ private fun positionLabel(position: String?): String =
         else -> position.orEmpty()
     }
 
-/**
- * A visszaadott lista első eleme a kapus, utána a vonalak a védőktől a
- * támadókig. Először a formációt használjuk (ha a számok kiadják a 10
- * mezőnyjátékost), egyébként a posztok szerint csoportosítunk.
- */
 private fun buildRows(lineup: MatchLineup): List<List<LineupPlayer>> {
     val players = lineup.startingPlayers
     if (players.isEmpty()) return emptyList()
@@ -573,13 +805,17 @@ private fun buildRows(lineup: MatchLineup): List<List<LineupPlayer>> {
 }
 
 // ================================================================
-// GÓL / LAP JELZÉSEK A JÁTÉKOSOKON
+// GÓL / GÓLPASSZ / LAP / CSERE JELZÉSEK A JÁTÉKOSOKON
 // ================================================================
 
 private data class PlayerBadges(
     val goals: Int = 0,
+    val assists: Int = 0,
     val yellow: Int = 0,
-    val red: Int = 0
+    val red: Int = 0,
+    val subbedOut: Boolean = false,
+    val subbedIn: Boolean = false,
+    val subMinute: String? = null
 )
 
 private fun badgesFor(
@@ -596,30 +832,51 @@ private fun badgesFor(
     val everyone = lineup.startingPlayers + lineup.substitutePlayers
     val result = mutableMapOf<LineupPlayer, PlayerBadges>()
 
-    lineup.startingPlayers.forEach { player ->
+    everyone.forEach { player ->
         var goals = 0
+        var assists = 0
         var yellow = 0
         var red = 0
+        var subbedOut = false
+        var subbedIn = false
+        var subMinute: String? = null
+
         teamEvents.forEach { event ->
-            if (!samePlayer(event.player, player, everyone)) return@forEach
-            when (eventKind(event)) {
-                1 -> goals++
-                2 -> yellow++
-                3 -> red++
+            val kind = eventKind(event)
+            if (samePlayer(event.player, player, everyone)) {
+                when (kind) {
+                    1 -> goals++
+                    2 -> yellow++
+                    3 -> red++
+                    4 -> {
+                        subbedOut = true
+                        subMinute = event.minute.filter { it.isDigit() }
+                    }
+                }
+            }
+            val assistName = event.assist.orEmpty()
+            if (assistName.isNotBlank() && samePlayer(assistName, player, everyone)) {
+                when (kind) {
+                    1 -> assists++
+                    4 -> {
+                        subbedIn = true
+                        subMinute = event.minute.filter { it.isDigit() }
+                    }
+                }
             }
         }
-        if (goals + yellow + red > 0) {
-            result[player] = PlayerBadges(goals, yellow, red)
+        if (goals + assists + yellow + red > 0 || subbedOut || subbedIn) {
+            result[player] = PlayerBadges(goals, assists, yellow, red, subbedOut, subbedIn, subMinute)
         }
     }
     return result
 }
 
-/** 1 = gól, 2 = sárga lap, 3 = piros lap, 0 = egyéb / nem számít. */
 private fun eventKind(event: MatchEvent): Int {
     val type = event.type.lowercase(Locale.ROOT)
     val detail = event.detail.orEmpty().lowercase(Locale.ROOT)
     return when {
+        type.contains("sub") || type.contains("csere") -> 4
         type.contains("own") || type.contains("öngól") || detail.contains("own") -> 0
         type.contains("sárga") || type.contains("yellow") ->
             if (type.contains("red") || type.contains("piros") || type.contains("yellowred")) 3 else 2
@@ -642,11 +899,6 @@ private fun eventBelongs(event: MatchEvent, teamName: String, isHome: Boolean): 
     return t.contains(name) || name.contains(t)
 }
 
-/**
- * Az események játékosnevei gyakran rövidítettek ("J. Martinez"), ezért
- * a teljes név egyezése mellett a vezetéknév + keresztnév-kezdőbetű is
- * elég, ha a vezetéknév a keretben egyedi.
- */
 private fun samePlayer(
     eventName: String,
     player: LineupPlayer,
