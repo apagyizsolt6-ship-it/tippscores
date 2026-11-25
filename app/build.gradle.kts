@@ -52,6 +52,9 @@ dependencies {
     // Coil (Logók)
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // ML Kit: eszközön futó angol -> magyar fordítás (a sztorik, indoklások, időjárás magyarul)
+    implementation("com.google.mlkit:translate:17.0.3")
+
     // Room Database (KSP-vel)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
