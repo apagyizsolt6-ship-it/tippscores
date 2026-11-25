@@ -3,6 +3,7 @@ package com.example.tippscores.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -288,15 +290,38 @@ private fun StandingsRowView(row: StandingRow, colors: AppColorScheme) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Cell(row.position.toString(), 24, colors, bold = true)
-            Text(
-                row.team,
-                modifier = Modifier.weight(1f),
-                color = colors.primaryText,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    row.team,
+                    color = colors.primaryText,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                val form = row.form?.takeIf { it.isNotBlank() }
+                val description = row.description?.takeIf { it.isNotBlank() }
+
+                if (form != null || description != null) {
+                    Spacer(Modifier.height(3.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (form != null) {
+                            FormDots(form)
+                        }
+                        if (description != null) {
+                            if (form != null) Spacer(Modifier.width(6.dp))
+                            Text(
+                                description,
+                                color = descriptionColor(description, colors),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
             Cell(row.played.toString(), 26, colors)
             Cell(row.won.toString(), 26, colors)
             Cell(row.drawn.toString(), 26, colors)
@@ -304,6 +329,39 @@ private fun StandingsRowView(row: StandingRow, colors: AppColorScheme) {
             Cell("${row.goalsFor}:${row.goalsAgainst}", 46, colors)
             Cell(row.points.toString(), 30, colors, bold = true)
         }
+    }
+}
+
+@Composable
+private fun FormDots(form: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        form.take(6).forEach { letter ->
+            val color = when (letter.uppercaseChar()) {
+                'W' -> Color(0xFF16A34A)
+                'D' -> Color(0xFFD97706)
+                'L' -> Color(0xFFDC2626)
+                else -> Color(0xFF94A3B8)
+            }
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .background(color, CircleShape)
+            )
+        }
+    }
+}
+
+private fun descriptionColor(description: String, colors: AppColorScheme): Color {
+    val text = description.lowercase()
+    return when {
+        text.contains("relegation") -> Color(0xFFDC2626)
+        text.contains("promotion") || text.contains("champions") -> Color(0xFF16A34A)
+        text.contains("europa") || text.contains("conference") || text.contains("playoff") ->
+            Color(0xFF2563EB)
+        else -> colors.tertiaryText
     }
 }
 
