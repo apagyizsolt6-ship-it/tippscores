@@ -894,3 +894,13 @@ private fun formatNumber(raw: String): String {
 
 private fun Modifier.clickableCompat(onClick: () -> Unit): Modifier =
     clickable(onClick = onClick)
+    
+private fun positionLabelHu(position: String?): String =
+    when (position?.trim()?.uppercase()) {
+        "G", "GK", "GOALKEEPER" -> "Kapus"
+        "D", "DEFENDER" -> "Védő"
+        "M", "MIDFIELDER" -> "Középpályás"
+        "F", "A", "FORWARD", "ATTACKER" -> "Támadó"
+        else -> position.orEmpty()
+    }
+    
