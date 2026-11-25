@@ -11,6 +11,7 @@ import com.example.tippscores.data.model.PlayerProfile
 import com.example.tippscores.data.model.PlayerTransfer
 import com.example.tippscores.data.model.TeamTrophy
 import com.example.tippscores.data.remote.NetworkModule
+import com.example.tippscores.data.util.JsonX
 import com.example.tippscores.data.util.TtlCache
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
@@ -363,8 +364,7 @@ class MatchDetailsRepository(
                 url = "https://statpal.io/api/v2/soccer/predictions?match_id=$matchId",
                 accessKey = key
             )
-            root.getAsJsonObject("prediction")?.get("outcome")?.asString
-                ?: root.get("prediction")?.asString
+            JsonX.text(JsonX.obj(root.get("prediction")), "choice", "outcome", "pick")
         } catch (_: Exception) { null }
     }
 
@@ -376,8 +376,9 @@ class MatchDetailsRepository(
                 url = "https://statpal.io/api/v2/soccer/weather-forecast?match_id=$matchId",
                 accessKey = key
             )
-            val temp = root.getAsJsonObject("weather")?.get("temperature")?.asString
-            val cond = root.getAsJsonObject("weather")?.get("condition")?.asString
+            val forecast = JsonX.obj(root.get("forecast"))
+            val temp = JsonX.text(forecast, "temp_celsius")?.let { "$it °C" }
+            val cond = JsonX.text(forecast, "condition")
             listOfNotNull(temp, cond).joinToString(" • ").ifBlank { null }
         } catch (_: Exception) { null }
     }

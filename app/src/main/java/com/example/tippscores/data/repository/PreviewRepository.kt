@@ -68,8 +68,11 @@ class PreviewRepository(
                 firstJson(key, urls)
             }
 
+            val storyResult = parseStorylines(stories.await())
+
             MatchPreview(
-                storylines = parseStorylines(stories.await()),
+                storylines = storyResult.storylines,
+                rivalry = storyResult.rivalry,
                 prediction = parsePrediction(prediction.await()),
                 weather = parseWeather(weather.await()),
                 odds = parseOdds(odds.await(), isLive)
@@ -97,74 +100,133 @@ class PreviewRepository(
     }
 
     // ------------------------------------------------------------
-    // SZTORIK
+    // SZTORIK  (live_storylines: match_context / home / away / rivalry)
     // ------------------------------------------------------------
 
-    private fun parseStorylines(root: JsonObject?): List<Storyline> {
-        if (root == null) return emptyList()
+    private class StoryResult(
+        val storylines: List<Storyline>,
+        val rivalry: String?
+    )
+
+    private fun parseStorylines(root: JsonObject?): StoryResult {
+        val live = JsonX.obj(root?.get("live_storylines"))
+            ?: return StoryResult(emptyList(), null)
+
+        val meta = JsonX.obj(root?.get("meta"))
+        val homeName = JsonX.text(JsonX.obj(meta?.get("home_team")), "name") ?: "Hazai csapat"
+        val awayName = JsonX.text(JsonX.obj(meta?.get("away_team")), "name") ?: "Vendégcsapat"
+
         val result = mutableListOf<Storyline>()
-        JsonX.walkObjects(root) { o ->
-            val text = JsonX.text(
-                o, "text", "content", "body", "insight", "story",
-                "narrative", "quote", "description"
-            )
-            if (text != null && text.length >= 25) {
-                val title = JsonX.text(o, "title", "headline", "summary")
-                    ?.takeIf { it != text }
-                result += Storyline(
-                    date = JsonX.text(o, "date", "published", "created_at"),
-                    tag = JsonX.text(o, "type", "category", "kind", "label"),
-                    title = title,
-                    text = text
-                )
+
+        fun addSection(element: JsonElement?, label: String) {
+            JsonX.objects(element).forEach { o ->
+                val type = JsonX.text(o, "type")?.lowercase()
+                if (type == "quote") {
+                    val quote = JsonX.text(o, "quote", "text") ?: return@forEach
+                    result += Storyline(
+                        section = label,
+                        isQuote = true,
+                        text = quote,
+                        speaker = JsonX.text(o, "speaker"),
+                        context = JsonX.text(o, "context")
+                    )
+                } else {
+                    val summary = JsonX.text(o, "summary", "text", "insight", "content")
+                        ?: return@forEach
+                    result += Storyline(section = label, text = summary)
+                }
             }
         }
-        return result.distinctBy { it.text }.take(12)
+
+        addSection(live.get("match_context"), "Mérkőzés")
+        addSection(live.get("home"), homeName)
+        addSection(live.get("away"), awayName)
+
+        val rivalryObject = JsonX.obj(live.get("rivalry"))
+        val derbyName = JsonX.text(rivalryObject, "derby_name_localized", "derby_name")
+        val rivalry = when {
+            derbyName != null -> "Derbi: $derbyName"
+            JsonX.text(rivalryObject, "is_named_derby") == "true" -> "Híres derbi"
+            JsonX.text(rivalryObject, "same_city") == "true" -> "Városi rangadó"
+            else -> null
+        }
+
+        return StoryResult(result.distinctBy { it.text }.take(16), rivalry)
     }
 
     // ------------------------------------------------------------
-    // MODELL-TIPP
+    // MODELL-TIPP  (prediction: choice / reasoning / pre_match_odds)
     // ------------------------------------------------------------
 
     private fun parsePrediction(root: JsonObject?): PredictionInfo? {
-        if (root == null) return null
-        val pick = JsonX.deepText(
-            root, 3, "outcome", "pick", "model_pick", "prediction",
-            "recommendation", "winner"
-        ) ?: return null
+        val prediction = JsonX.obj(root?.get("prediction")) ?: return null
+        val choice = JsonX.text(prediction, "choice", "outcome", "pick") ?: return null
 
-        val reasoning = listOfNotNull(
-            JsonX.deepText(root, 3, "reasoning", "analysis", "explanation", "rationale", "text", "summary")
-        ).firstOrNull()
+        val odds = JsonX.obj(prediction.get("pre_match_odds"))
+        val market = JsonX.text(odds, "market")
+        val modifier = JsonX.text(odds, "modifier")
+
+        val marketLabel = market?.let {
+            val base = when (it.lowercase()) {
+                "asian_handicap" -> "Ázsiai hendikep"
+                "over_under", "goals_over_under" -> "Gólok száma"
+                "1x2", "match_winner" -> "Mérkőzés kimenetele"
+                "both_teams_to_score", "btts" -> "Mindkét csapat szerez gólt"
+                else -> it.replace('_', ' ').replaceFirstChar { c -> c.uppercase() }
+            }
+            if (modifier != null) "$base ($modifier)" else base
+        }
+
+        val selection = JsonX.text(odds, "selection")?.let {
+            when (it.lowercase()) {
+                "home" -> "Hazai"
+                "away" -> "Vendég"
+                "draw" -> "Döntetlen"
+                "over" -> "Több"
+                "under" -> "Kevesebb"
+                else -> it
+            }
+        }
 
         return PredictionInfo(
-            market = JsonX.deepText(root, 3, "market", "bet_type", "type"),
-            pick = pick,
-            odds = JsonX.toDouble(JsonX.deepText(root, 3, "odds", "price", "odd")),
-            reasoning = reasoning
+            market = marketLabel,
+            selection = selection,
+            pick = choice,
+            odds = JsonX.toDouble(JsonX.text(odds, "odd", "odds")),
+            reasoning = JsonX.text(prediction, "reasoning", "analysis", "explanation")
         )
     }
 
     // ------------------------------------------------------------
-    // IDŐJÁRÁS
+    // IDŐJÁRÁS  (location + forecast)
     // ------------------------------------------------------------
 
     private fun parseWeather(root: JsonObject?): WeatherInfo? {
-        if (root == null) return null
-        val temperature = JsonX.deepText(root, 3, "temperature", "temp", "temperature_c")
-        val condition = JsonX.deepText(root, 3, "condition", "description", "summary", "weather")
+        val forecast = JsonX.obj(root?.get("forecast")) ?: return null
+        val location = JsonX.obj(root?.get("location"))
+
+        val temperature = JsonX.text(forecast, "temp_celsius")?.let { "$it °C" }
+        val condition = JsonX.text(forecast, "condition")
         if (temperature == null && condition == null) return null
 
+        val windDirection = JsonX.text(forecast, "wind_direction")
+
         return WeatherInfo(
+            place = listOfNotNull(
+                JsonX.text(location, "city"),
+                JsonX.text(location, "country")
+            ).joinToString(", ").takeIf { it.isNotBlank() },
+            localTime = JsonX.text(root, "match_time_local"),
             temperature = temperature,
             condition = condition,
-            feelsLike = JsonX.deepText(root, 3, "feels_like", "feelslike", "apparent_temperature"),
-            wind = JsonX.deepText(root, 3, "wind_speed", "windspeed", "wind"),
-            rainChance = JsonX.deepText(
-                root, 3, "rain_chance", "precipitation_probability", "precip_prob",
-                "chance_of_rain", "rain"
-            ),
-            humidity = JsonX.deepText(root, 3, "humidity")
+            feelsLike = JsonX.text(forecast, "feels_like_celsius")?.let { "$it °C" },
+            wind = JsonX.text(forecast, "wind_kmh")?.let {
+                "$it km/h" + (windDirection?.let { d -> " $d" } ?: "")
+            },
+            rainChance = JsonX.text(forecast, "rain_chance_percent")?.let { "$it%" },
+            humidity = JsonX.text(forecast, "humidity_percent")?.let { "$it%" },
+            cloudCover = JsonX.text(forecast, "cloud_cover_percent")?.let { "$it%" },
+            uvIndex = JsonX.text(forecast, "uv_index")
         )
     }
 

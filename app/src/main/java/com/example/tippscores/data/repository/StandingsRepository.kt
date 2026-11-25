@@ -69,8 +69,13 @@ class StandingsRepository(
                 drawn = number("draw", "draws", "drawn", "d", "overall_d"),
                 lost = number("lost", "losses", "loss", "l", "overall_l"),
                 goalsFor = number("goals_for", "gf", "scored", "goals_scored", "overall_gs", "gs"),
-                goalsAgainst = number("goals_against", "ga", "conceded", "goals_conceded", "overall_ga"),
-                points = points
+                goalsAgainst = number(
+                    "goals_allowed", "goals_against", "ga", "conceded",
+                    "goals_conceded", "overall_ga"
+                ),
+                points = points,
+                form = JsonX.text(o, "recent_form", "form"),
+                description = JsonX.text(JsonX.obj(o.get("description")), "value")
             )
         }
 
