@@ -39,12 +39,15 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.tippscores.data.model.LeaguePlayerStat
 import com.example.tippscores.data.model.LeagueStats
+import com.example.tippscores.data.model.StandingRow
 import com.example.tippscores.data.model.TeamLeagueRecord
 import com.example.tippscores.data.model.TeamMinuteBucket
 import com.example.tippscores.data.model.TeamProfile
 import com.example.tippscores.data.model.TeamSquadPlayer
 import com.example.tippscores.data.remote.StatpalImages
+import com.example.tippscores.data.repository.StandingsRepository
 import com.example.tippscores.data.repository.TeamProfileRepository
+import com.example.tippscores.data.util.JsonX
 import com.example.tippscores.ui.components.RemoteImage
 import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
@@ -60,7 +63,8 @@ fun TeamProfileScreen(
     fallbackLogoUrl: String,
     repository: TeamProfileRepository,
     onBack: () -> Unit,
-    onCoachClick: (String, String) -> Unit = { _, _ -> }
+    onCoachClick: (String, String) -> Unit = { _, _ -> },
+    standingsRepository: StandingsRepository? = null
 ) {
     val colors = LocalAppColors.current
     var profile by remember(teamId, teamName) { mutableStateOf<TeamProfile?>(null) }
@@ -77,6 +81,25 @@ fun TeamProfileScreen(
         } else {
             try {
                 repository.fetchLeagueStats(leagueId)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    // Tabella-helyzet és forma (az utolsó meccsek betűi) a bajnoki tabellából.
+    var standing by remember(teamId, teamName) { mutableStateOf<StandingRow?>(null) }
+
+    LaunchedEffect(leagueId) {
+        standing = if (leagueId.isNullOrBlank() || standingsRepository == null) {
+            null
+        } else {
+            try {
+                val rows = standingsRepository.fetchStandings(leagueId)
+                val ownId = profile?.id ?: teamId
+                val ownName = JsonX.norm(profile?.name ?: teamName)
+                rows.firstOrNull { it.teamId != null && it.teamId == ownId }
+                    ?: rows.firstOrNull { JsonX.norm(it.team) == ownName }
             } catch (e: Exception) {
                 null
             }
@@ -181,7 +204,7 @@ fun TeamProfileScreen(
             } else {
                 val p = profile
                 if (p != null) {
-                    profileSections(p, leagueStats, colors, onCoachClick)
+                    profileSections(p, leagueStats, standing, colors, onCoachClick)
                 }
             }
         }
@@ -191,6 +214,7 @@ fun TeamProfileScreen(
 private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
     p: TeamProfile,
     leagueStats: LeagueStats?,
+    standing: StandingRow?,
     colors: AppColorScheme,
     onCoachClick: (String, String) -> Unit
 ) {
@@ -213,6 +237,49 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
                         null
                     }
                 )
+            }
+        }
+    }
+
+    // --- Tabella-helyzet + forma ---
+    if (standing != null) {
+        item {
+            SectionCard(title = "Tabella-helyzet", colors = colors) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${standing.position}.",
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 28.sp
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            "${standing.points} pont • ${standing.played} mérkőzés",
+                            color = colors.primaryText,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            "${standing.won} GY • ${standing.drawn} D • ${standing.lost} V • gólok ${standing.goalsFor}:${standing.goalsAgainst}",
+                            color = colors.secondaryText,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                val form = standing.form?.takeIf { it.isNotBlank() }
+                if (form != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Text("Forma (utolsó mérkőzések)", color = colors.tertiaryText, fontSize = 10.sp)
+                    Spacer(Modifier.height(4.dp))
+                    StandingFormRow(form)
+                }
+
+                standing.description?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, color = colors.secondaryText, fontSize = 11.sp)
+                }
             }
         }
     }
@@ -791,6 +858,29 @@ private fun SectionCard(
             Text(title, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
             Spacer(Modifier.height(7.dp))
             content()
+        }
+    }
+}
+
+@Composable
+private fun StandingFormRow(form: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        form.take(6).forEach { letter ->
+            val (label, color) = when (letter.uppercaseChar()) {
+                'W' -> "GY" to Color(0xFF16A34A)
+                'D' -> "D" to Color(0xFFD97706)
+                'L' -> "V" to Color(0xFFDC2626)
+                else -> "?" to Color(0xFF94A3B8)
+            }
+            Surface(
+                modifier = Modifier.size(26.dp),
+                shape = CircleShape,
+                color = color
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(label, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                }
+            }
         }
     }
 }

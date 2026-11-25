@@ -109,7 +109,7 @@ fun MatchDetailScreen(
         if (selectedTab == 3 && match != null && preview == null && previewRepository != null) {
             previewLoading = true
             preview = try {
-                previewRepository.fetch(match.id, match.isLive)
+                previewRepository.fetch(match.id, match.leagueId, match.isLive)
             } catch (e: Exception) {
                 null
             }
