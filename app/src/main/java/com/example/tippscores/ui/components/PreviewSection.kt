@@ -45,6 +45,8 @@ fun PreviewSection(
     val colors = LocalAppColors.current
 
     Column {
+        val hasContent = (preview != null && !preview.isEmpty) || injuries.isNotEmpty()
+
         if (loading) {
             PreviewCard(null, colors) {
                 Column(
@@ -56,11 +58,7 @@ fun PreviewSection(
                     Text("Előzetes adatok betöltése…", color = colors.secondaryText, fontSize = 12.sp)
                 }
             }
-            return@Column
-        }
-
-        val hasContent = (preview != null && !preview.isEmpty) || injuries.isNotEmpty()
-        if (!hasContent) {
+        } else if (!hasContent) {
             PreviewCard(null, colors) {
                 Text(
                     "Ehhez a mérkőzéshez jelenleg nincs előzetes adat. A StatPal előzetesei (tipp, szorzók, sztorik, időjárás) főleg a nagyobb mérkőzésekre érhetők el.",
@@ -68,9 +66,7 @@ fun PreviewSection(
                     fontSize = 12.sp
                 )
             }
-            return@Column
-        }
-
+        } else {
         val rivalry = preview?.rivalry
         if (rivalry != null) {
             Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFFEE2E2)) {
@@ -224,6 +220,7 @@ fun PreviewSection(
                     }
                 }
             }
+        }
         }
     }
 }

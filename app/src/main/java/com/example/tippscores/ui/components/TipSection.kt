@@ -83,10 +83,7 @@ fun TipSection(
                     color = colors.secondaryText,
                     fontSize = 12.sp
                 )
-                return@Column
-            }
-
-            if (editable) {
+            } else if (editable) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
