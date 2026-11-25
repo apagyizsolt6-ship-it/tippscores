@@ -841,6 +841,7 @@ private fun ProfessionalStatisticRow(
     }
 }
 
+@Composable
 private fun EventRow(event: MatchEvent) {
     val colors = LocalAppColors.current
     Surface(
