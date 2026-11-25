@@ -34,6 +34,7 @@ import com.example.tippscores.data.local.TipStore
 import com.example.tippscores.data.remote.StatpalImages
 import com.example.tippscores.data.repository.PreviewRepository
 import com.example.tippscores.data.repository.StandingsRepository
+import com.example.tippscores.data.util.JsonX
 import com.example.tippscores.ui.screens.LeagueScreen
 import com.example.tippscores.ui.screens.TipsScreen
 import com.example.tippscores.data.repository.CoachProfileRepository
@@ -118,9 +119,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // A rendszer értesítési engedélykérő ablaka (Android 13+). Az
-    // eredményt nem kell külön kezelni: ha megtagadja, a
-    // NotificationHelper úgyis csendben elnyeli a próbálkozást.
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -174,12 +172,8 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onCreate(savedInstanceState)
 
-        // A StatPal képek (logó, fotó) az API-kulccsal kérhetők le.
         StatpalImages.keyProvider = { apiPreferences.statpalApiKey }
 
-        // Ha korábban már be volt kapcsolva a gólértesítés, induláskor
-        // is biztosítsuk, hogy az ütemezett háttérellenőrzés fusson
-        // (pl. újraindítás vagy frissítés után is).
         if (apiPreferences.goalNotificationsEnabled) {
             updateGoalNotificationScheduling(true)
         }
@@ -200,7 +194,6 @@ class MainActivity : ComponentActivity() {
 
             val lastUpdated by
                 viewModel.lastUpdated.collectAsState()
-
 
             val selectedOffset by
                 viewModel.selectedOffset.collectAsState()
@@ -249,6 +242,11 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf<String?>(null)
                 }
 
+            var selectedTeamLeagueId by
+                remember {
+                    mutableStateOf<String?>(null)
+                }
+
             var selectedCoachId by
                 remember {
                     mutableStateOf<String?>(null)
@@ -284,7 +282,6 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(false)
                 }
 
-            // A lejátszott meccsek eredményéből automatikusan kiértékeli a tippeket.
             LaunchedEffect(matches) {
                 tipStore.settleFrom(matches)
             }
@@ -299,9 +296,7 @@ class MainActivity : ComponentActivity() {
                 ) {
 
                     val currentMatchId = selectedMatchId
-
                     val currentTeamName = selectedTeamName
-
                     val currentCoachId = selectedCoachId
                     val currentLeagueId = selectedLeagueId
 
@@ -342,6 +337,7 @@ class MainActivity : ComponentActivity() {
                             fallbackLogoUrl = selectedTeamLogo,
                             repository = teamProfileRepository,
                             standingsRepository = standingsRepository,
+                            leagueIdHint = selectedTeamLeagueId,
                             onCoachClick = { coachId, coachName ->
                                 selectedCoachId = coachId
                                 selectedCoachName = coachName
@@ -350,6 +346,7 @@ class MainActivity : ComponentActivity() {
                                 selectedTeamName = null
                                 selectedTeamLogo = ""
                                 selectedTeamId = null
+                                selectedTeamLeagueId = null
                             }
                         )
 
@@ -402,21 +399,27 @@ class MainActivity : ComponentActivity() {
                             tipStore = tipStore,
 
                             onTeamClick = { teamName, logoUrl ->
-                                // A StatPal csapatprofil azonosítót vár, ezért a
-                                // megnyitott meccsből keressük ki a csapat ID-ját.
-                                val openMatch =
-                                    matches.find { it.id == currentMatchId }
+                                val openMatch = matches.find { it.id == currentMatchId }
+                                val normTarget = JsonX.norm(teamName)
 
-                                selectedTeamId =
-                                    when {
-                                        openMatch == null -> null
-                                        openMatch.homeTeam == teamName ->
-                                            openMatch.homeTeamId
-                                        openMatch.awayTeam == teamName ->
-                                            openMatch.awayTeamId
-                                        else -> null
+                                val foundId = when {
+                                    openMatch?.homeTeam == teamName && !openMatch.homeTeamId.isNullOrBlank() ->
+                                        openMatch.homeTeamId
+                                    openMatch?.awayTeam == teamName && !openMatch.awayTeamId.isNullOrBlank() ->
+                                        openMatch.awayTeamId
+                                    else -> matches.firstNotNullOfOrNull { m ->
+                                        when {
+                                            JsonX.norm(m.homeTeam) == normTarget && !m.homeTeamId.isNullOrBlank() ->
+                                                m.homeTeamId
+                                            JsonX.norm(m.awayTeam) == normTarget && !m.awayTeamId.isNullOrBlank() ->
+                                                m.awayTeamId
+                                            else -> null
+                                        }
                                     }
+                                }
 
+                                selectedTeamId = foundId
+                                selectedTeamLeagueId = openMatch?.leagueId
                                 selectedTeamName = teamName
                                 selectedTeamLogo = logoUrl
                             }
@@ -463,7 +466,6 @@ class MainActivity : ComponentActivity() {
                             isLoading = isLoading,
 
                             statpalKey = statpalKey,
-
 
                             selectedOffset = selectedOffset,
 
