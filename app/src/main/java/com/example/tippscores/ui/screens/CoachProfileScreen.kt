@@ -38,6 +38,7 @@ import com.example.tippscores.data.model.CoachProfile
 import com.example.tippscores.data.remote.StatpalImages
 import com.example.tippscores.data.repository.CoachProfileRepository
 import com.example.tippscores.ui.components.RemoteImage
+import com.example.tippscores.ui.components.rememberHu
 import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
 
@@ -103,7 +104,7 @@ fun CoachProfileScreen(
                     name = profile?.name ?: coachName,
                     subtitle = listOfNotNull(
                         profile?.team?.takeIf { it.isNotBlank() },
-                        profile?.nationality?.takeIf { it.isNotBlank() }
+                        rememberHu(profile?.nationality)?.takeIf { it.isNotBlank() }
                     ).joinToString(" • "),
                     colors = colors
                 )
@@ -143,13 +144,13 @@ fun CoachProfileScreen(
                         CoachInfoRow("Születési dátum", p.birthdate, colors)
                         CoachInfoRow(
                             "Születési hely",
-                            listOfNotNull(p.birthplace, p.birthcountry)
+                            listOfNotNull(p.birthplace, rememberHu(p.birthcountry))
                                 .distinct()
                                 .joinToString(", ")
                                 .takeIf { it.isNotBlank() },
                             colors
                         )
-                        CoachInfoRow("Nemzetiség", p.nationality, colors)
+                        CoachInfoRow("Nemzetiség", rememberHu(p.nationality), colors)
                         CoachInfoRow("Magasság", p.height, colors)
                         CoachInfoRow("Testsúly", p.weight, colors)
                         CoachInfoRow("Jelenlegi csapat", p.team, colors)
@@ -175,7 +176,7 @@ fun CoachProfileScreen(
                                         fontSize = 12.sp
                                     )
                                     Text(
-                                        "${stop.from ?: "?"} – ${stop.to?.takeIf { it.isNotBlank() } ?: "jelenleg"}",
+                                        "${rememberHu(stop.from) ?: "?"} – ${rememberHu(stop.to?.takeIf { it.isNotBlank() }) ?: "jelenleg"}",
                                         color = colors.secondaryText,
                                         fontSize = 11.sp
                                     )
@@ -195,7 +196,7 @@ fun CoachProfileScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            listOfNotNull(trophy.league, trophy.country?.let { "($it)" })
+                                            listOfNotNull(trophy.league, rememberHu(trophy.country)?.let { "($it)" })
                                                 .joinToString(" "),
                                             modifier = Modifier.weight(1f),
                                             color = colors.primaryText,
@@ -203,7 +204,7 @@ fun CoachProfileScreen(
                                             fontSize = 12.sp
                                         )
                                         Text(
-                                            listOfNotNull(trophy.status, trophy.count?.let { "×$it" })
+                                            listOfNotNull(rememberHu(trophy.status), trophy.count?.let { "×$it" })
                                                 .joinToString(" "),
                                             color = colors.secondaryText,
                                             fontSize = 11.sp

@@ -46,6 +46,7 @@ import com.example.tippscores.data.model.Match
 import com.example.tippscores.data.model.StandingRow
 import com.example.tippscores.data.repository.StandingsRepository
 import com.example.tippscores.data.repository.TeamProfileRepository
+import com.example.tippscores.ui.components.rememberHu
 import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
 
@@ -312,7 +313,7 @@ private fun StandingsRowView(row: StandingRow, colors: AppColorScheme) {
                         if (description != null) {
                             if (form != null) Spacer(Modifier.width(6.dp))
                             Text(
-                                description,
+                                rememberHu(description) ?: description,
                                 color = descriptionColor(description, colors),
                                 fontSize = 9.sp,
                                 maxLines = 1,

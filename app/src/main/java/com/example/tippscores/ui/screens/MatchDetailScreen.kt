@@ -76,6 +76,7 @@ import com.example.tippscores.data.repository.PreviewRepository
 import com.example.tippscores.ui.components.EventTimeline
 import com.example.tippscores.ui.components.FullPitchLineupCard
 import com.example.tippscores.ui.components.PreviewSection
+import com.example.tippscores.ui.components.rememberHu
 import com.example.tippscores.ui.components.TipSection
 import com.example.tippscores.ui.theme.LocalAppColors
 import java.util.Locale
@@ -1183,7 +1184,7 @@ private fun PlayerCardDialog(
 
                     profile != null -> {
                         PlayerInfoRow("Kor", profile.age)
-                        PlayerInfoRow("Nemzetiség", profile.nationality)
+                        PlayerInfoRow("Nemzetiség", rememberHu(profile.nationality))
                         PlayerInfoRow("Születési dátum", profile.birthdate)
                         PlayerInfoRow("Születési hely", profile.birthplace)
                         PlayerInfoRow("Magasság", profile.height?.let { "$it cm" })
@@ -1261,7 +1262,7 @@ private fun PlayerCardDialog(
                             profile.trophies.forEach { trophy ->
                                 PlayerInfoRow(
                                     trophy.league,
-                                    listOfNotNull(trophy.status, trophy.count?.let { "×$it" })
+                                    listOfNotNull(rememberHu(trophy.status), trophy.count?.let { "×$it" })
                                         .joinToString(" ")
                                         .takeIf { it.isNotBlank() }
                                 )
@@ -1286,7 +1287,7 @@ private fun PlayerCardDialog(
                                         listOfNotNull(transfer.from, transfer.to)
                                             .joinToString(" → ")
                                             .takeIf { it.isNotBlank() },
-                                        transfer.type,
+                                        rememberHu(transfer.type),
                                         transfer.price
                                     ).joinToString(" • ")
                                 )
@@ -1655,7 +1656,7 @@ private fun ExtraInfoCard(details: MatchDetails?) {
                     Spacer(Modifier.width(10.dp))
                     Column {
                         Text("Előrejelzés", color = colors.tertiaryText, fontSize = 10.sp)
-                        Text(details.prediction ?: "", color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(rememberHu(details.prediction) ?: "", color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }
@@ -1665,7 +1666,14 @@ private fun ExtraInfoCard(details: MatchDetails?) {
                     Spacer(Modifier.width(10.dp))
                     Column {
                         Text("Időjárás", color = colors.tertiaryText, fontSize = 10.sp)
-                        Text(details.weather ?: "", color = colors.secondaryText, fontSize = 13.sp)
+                        val weatherParts = (details.weather ?: "").split(" • ")
+                        val weatherCondition = rememberHu(weatherParts.getOrNull(1))
+                        Text(
+                            listOfNotNull(weatherParts.firstOrNull()?.takeIf { it.isNotBlank() }, weatherCondition)
+                                .joinToString(" • "),
+                            color = colors.secondaryText,
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }

@@ -49,6 +49,7 @@ import com.example.tippscores.data.repository.StandingsRepository
 import com.example.tippscores.data.repository.TeamProfileRepository
 import com.example.tippscores.data.util.JsonX
 import com.example.tippscores.ui.components.RemoteImage
+import com.example.tippscores.ui.components.rememberHu
 import com.example.tippscores.ui.theme.AppColorScheme
 import com.example.tippscores.ui.theme.LocalAppColors
 
@@ -226,7 +227,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
                 InfoRow("Stadion", p.venueName, colors)
                 InfoRow("Város", p.venueCity, colors)
                 InfoRow("Befogadóképesség", p.venueCapacity?.let { formatNumber(it) }, colors)
-                InfoRow("Pálya", p.venueSurface, colors)
+                InfoRow("Pálya", rememberHu(p.venueSurface), colors)
                 InfoRow(
                     label = "Edző",
                     value = p.coachName?.let { if (p.coachId != null) "$it ›" else it },
@@ -278,7 +279,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
 
                 standing.description?.takeIf { it.isNotBlank() }?.let {
                     Spacer(Modifier.height(8.dp))
-                    Text(it, color = colors.secondaryText, fontSize = 11.sp)
+                    Text(rememberHu(it) ?: it, color = colors.secondaryText, fontSize = 11.sp)
                 }
             }
         }
@@ -536,7 +537,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
                             Text(t.playerName, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             val detail = listOfNotNull(
                                 t.otherTeam?.let { if (t.isIncoming) "innen: $it" else "ide: $it" },
-                                t.type,
+                                rememberHu(t.type),
                                 t.price
                             ).joinToString(" • ")
                             if (detail.isNotBlank()) {
@@ -568,7 +569,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileSections(
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
-                                listOfNotNull(trophy.status, trophy.count?.let { "×$it" })
+                                listOfNotNull(rememberHu(trophy.status), trophy.count?.let { "×$it" })
                                     .joinToString(" "),
                                 color = colors.secondaryText,
                                 fontSize = 11.sp
@@ -826,7 +827,7 @@ private fun ProfileHeader(
             Spacer(Modifier.height(10.dp))
             Text(name, color = colors.primaryText, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, textAlign = TextAlign.Center)
             val subtitle = listOfNotNull(
-                country?.takeIf { it.isNotBlank() },
+                rememberHu(country)?.takeIf { it.isNotBlank() },
                 league?.takeIf { it.isNotBlank() },
                 founded?.takeIf { it.isNotBlank() }?.let { "alapítva: $it" }
             ).joinToString(" • ")
