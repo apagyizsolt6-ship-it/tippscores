@@ -341,6 +341,7 @@ class MainActivity : ComponentActivity() {
                             teamName = currentTeamName,
                             fallbackLogoUrl = selectedTeamLogo,
                             repository = teamProfileRepository,
+                            standingsRepository = standingsRepository,
                             onCoachClick = { coachId, coachName ->
                                 selectedCoachId = coachId
                                 selectedCoachName = coachName
