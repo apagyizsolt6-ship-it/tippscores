@@ -203,7 +203,7 @@ private fun EventText(
 
         val secondary = listOfNotNull(
             event.assist?.takeIf { it.isNotBlank() }?.let { "gólpassz: $it" },
-            event.detail?.takeIf { it.isNotBlank() }
+            rememberHu(event.detail)?.takeIf { it.isNotBlank() }
         ).joinToString(" • ")
 
         if (secondary.isNotBlank()) {

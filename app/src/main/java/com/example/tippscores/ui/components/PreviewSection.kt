@@ -86,7 +86,7 @@ fun PreviewSection(
             PreviewCard("Modell-tipp", colors) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        prediction.pick,
+                        rememberHu(prediction.pick) ?: prediction.pick,
                         modifier = Modifier.weight(1f),
                         color = colors.primaryText,
                         fontWeight = FontWeight.ExtraBold,
@@ -113,7 +113,7 @@ fun PreviewSection(
                 }
                 if (!prediction.reasoning.isNullOrBlank()) {
                     Spacer(Modifier.height(8.dp))
-                    Text(prediction.reasoning, color = colors.secondaryText, fontSize = 12.sp)
+                    Text(rememberHu(prediction.reasoning) ?: prediction.reasoning, color = colors.secondaryText, fontSize = 12.sp)
                 }
             }
         }
@@ -144,8 +144,9 @@ fun PreviewSection(
         if (weather != null) {
             Spacer(Modifier.height(12.dp))
             PreviewCard("Időjárás a meccs idején", colors) {
+                val conditionHu = rememberHu(weather.condition)
                 Text(
-                    listOfNotNull(weather.temperature, weather.condition).joinToString(" • "),
+                    listOfNotNull(weather.temperature, conditionHu).joinToString(" • "),
                     color = colors.primaryText,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
@@ -204,19 +205,23 @@ fun PreviewSection(
                         Spacer(Modifier.height(8.dp))
                     }
 
+                    val textHu = rememberHu(story.text) ?: story.text
+                    val speakerHu = rememberHu(story.speaker)
+                    val contextHu = rememberHu(story.context)
+
                     if (story.isQuote) {
                         Text(
-                            "„${story.text}”",
+                            "„$textHu”",
                             color = colors.secondaryText,
                             fontStyle = FontStyle.Italic,
                             fontSize = 12.sp
                         )
-                        val who = listOfNotNull(story.speaker, story.context).joinToString(" • ")
+                        val who = listOfNotNull(speakerHu, contextHu).joinToString(" • ")
                         if (who.isNotBlank()) {
                             Text("— $who", color = colors.tertiaryText, fontSize = 10.sp)
                         }
                     } else {
-                        Text(story.text, color = colors.secondaryText, fontSize = 12.sp)
+                        Text(textHu, color = colors.secondaryText, fontSize = 12.sp)
                     }
                 }
             }
