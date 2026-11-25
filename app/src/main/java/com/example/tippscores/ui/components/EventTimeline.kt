@@ -11,17 +11,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tippscores.data.model.MatchEvent
@@ -32,10 +33,6 @@ import com.example.tippscores.ui.theme.LocalAppColors
 private val HomeAccent = Color(0xFF2563EB)
 private val AwayAccent = Color(0xFFDC2626)
 
-/**
- * Időrendi idővonal: középen a perc, bal oldalon a hazai, jobb oldalon a
- * vendég csapat eseményei (gól, lap, csere), félidő-elválasztóval.
- */
 @Composable
 fun EventTimeline(
     events: List<MatchEvent>,
@@ -53,8 +50,9 @@ fun EventTimeline(
         shape = RoundedCornerShape(16.dp),
         color = colors.cardBackground
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
 
+            // Fejléc
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -64,59 +62,47 @@ fun EventTimeline(
                     modifier = Modifier.weight(1f),
                     color = HomeAccent,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 12.sp,
-                    maxLines = 1
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    "Idővonal",
-                    color = colors.tertiaryText,
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(64.dp)
+                    "Események",
+                    color = colors.secondaryText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp)
                 )
                 Text(
                     awayTeam,
                     modifier = Modifier.weight(1f),
                     color = AwayAccent,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.End,
                     maxLines = 1,
-                    textAlign = TextAlign.End
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = colors.divider.copy(alpha = 0.6f))
             Spacer(Modifier.height(8.dp))
 
-            val lineColor = colors.divider
+            var lastHalf = 1
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .drawBehind {
-                        drawLine(
-                            color = lineColor,
-                            start = Offset(size.width / 2f, 0f),
-                            end = Offset(size.width / 2f, size.height),
-                            strokeWidth = 2.dp.toPx()
-                        )
-                    }
-            ) {
-                var halfTimeShown = false
-
-                sorted.forEach { event ->
-                    val base = minuteKey(event.minute) / 100
-
-                    if (!halfTimeShown && base > 45) {
-                        halfTimeShown = true
-                        HalfTimeMarker(colors)
-                    }
-
-                    TimelineRow(
-                        event = event,
-                        isHome = isHomeEvent(event, homeTeam, awayTeam),
-                        colors = colors
-                    )
+            sorted.forEach { event ->
+                val currentHalf = if (minuteKey(event.minute) > 4500) 2 else 1
+                if (currentHalf > lastHalf) {
+                    HalfTimeMarker(colors)
+                    lastHalf = currentHalf
                 }
+
+                TimelineRow(
+                    event = event,
+                    isHome = isHomeEvent(event, homeTeam, awayTeam),
+                    colors = colors
+                )
             }
         }
     }
@@ -127,15 +113,18 @@ private fun HalfTimeMarker(colors: AppColorScheme) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(shape = RoundedCornerShape(8.dp), color = colors.divider) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = colors.divider.copy(alpha = 0.7f)
+        ) {
             Text(
                 "Félidő",
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 color = colors.secondaryText,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -149,6 +138,7 @@ private fun TimelineRow(
     colors: AppColorScheme
 ) {
     val icon = iconFor(event)
+    val accent = if (isHome) HomeAccent else AwayAccent
 
     Row(
         modifier = Modifier
@@ -156,68 +146,82 @@ private fun TimelineRow(
             .padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Bal oldal (hazai)
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            if (isHome) EventText(event, icon, colors, alignEnd = true)
+            if (isHome) {
+                EventCard(event, icon, accent, alignEnd = true, colors)
+            }
         }
 
+        // Középső perc
         Surface(
             modifier = Modifier
-                .padding(horizontal = 6.dp)
-                .width(52.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = colors.cardBackground
+                .padding(horizontal = 8.dp)
+                .width(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = colors.divider.copy(alpha = 0.35f)
         ) {
             Text(
                 text = if (event.minute.contains("'")) event.minute else "${event.minute}'",
-                modifier = Modifier.padding(vertical = 3.dp),
+                modifier = Modifier.padding(vertical = 6.dp),
                 color = colors.primaryText,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 textAlign = TextAlign.Center
             )
         }
 
+        // Jobb oldal (vendég)
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (!isHome) EventText(event, icon, colors, alignEnd = false)
+            if (!isHome) {
+                EventCard(event, icon, accent, alignEnd = false, colors)
+            }
         }
     }
 }
 
 @Composable
-private fun EventText(
+private fun EventCard(
     event: MatchEvent,
     icon: String,
-    colors: AppColorScheme,
-    alignEnd: Boolean
+    accent: Color,
+    alignEnd: Boolean,
+    colors: AppColorScheme
 ) {
     Column(
-        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
+        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(accent.copy(alpha = 0.10f))
+            .padding(horizontal = 10.dp, vertical = 7.dp)
     ) {
         Text(
             text = if (alignEnd) "${event.player} $icon" else "$icon ${event.player}",
             color = colors.primaryText,
             fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
-            textAlign = if (alignEnd) TextAlign.End else TextAlign.Start
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
 
         val secondary = listOfNotNull(
             event.assist?.takeIf { it.isNotBlank() }?.let { "gólpassz: $it" },
-            rememberHu(event.detail)?.takeIf { it.isNotBlank() }
+            event.detail?.takeIf { it.isNotBlank() }
         ).joinToString(" • ")
 
         if (secondary.isNotBlank()) {
             Text(
                 text = secondary,
                 color = colors.tertiaryText,
-                fontSize = 10.sp,
-                textAlign = if (alignEnd) TextAlign.End else TextAlign.Start
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
-/** "45+2" -> 4502, "67" -> 6700: rendezéshez és félidő-észleléshez. */
+/** "45+2" -> 4502, "67" -> 6700 */
 private fun minuteKey(raw: String): Int {
     val match = Regex("""(\d+)(?:\s*\+\s*(\d+))?""").find(raw) ?: return 0
     val base = match.groupValues[1].toIntOrNull() ?: 0
@@ -243,7 +247,7 @@ private fun iconFor(event: MatchEvent): String {
     val text = "${event.type} ${event.detail.orEmpty()}".lowercase()
     val isPenalty = text.contains("pen") || text.contains("tizenegyes")
     val isMissed = text.contains("miss") || text.contains("kihagy") ||
-        text.contains("saved") || text.contains("véd")
+            text.contains("saved") || text.contains("véd")
 
     return when {
         text.contains("own") || text.contains("öngól") -> "⚽ (öngól)"
