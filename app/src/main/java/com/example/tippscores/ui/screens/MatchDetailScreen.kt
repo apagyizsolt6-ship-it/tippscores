@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -678,103 +679,168 @@ private fun StatisticsSection(
         return
     }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.cardBackground
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                "Mérkőzés statisztikák",
-                color = colors.primaryText,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 15.sp
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(homeTeam, fontSize = 11.sp, color = colors.secondaryText, modifier = Modifier.weight(1f))
-                Text("STAT", fontSize = 10.sp, color = colors.tertiaryText, textAlign = TextAlign.Center, modifier = Modifier.width(90.dp))
-                Text(awayTeam, fontSize = 11.sp, color = colors.secondaryText, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(6.dp))
+    val possession = stats.find {
+        it.label.contains("labdabirtok", true) || it.label.contains("possession", true)
+    }
+    val otherStats = stats.filter { it != possession }
 
-            stats.forEach { stat ->
-                StatisticRow(stat)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+        possession?.let {
+            PossessionCard(it, homeTeam, awayTeam, colors)
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = colors.cardBackground
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "Mérkőzés statisztikák",
+                    color = colors.primaryText,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 15.sp
+                )
+                Spacer(Modifier.height(12.dp))
+
+                otherStats.forEachIndexed { index, stat ->
+                    ProfessionalStatisticRow(stat, colors)
+                    if (index != otherStats.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            color = colors.divider.copy(alpha = 0.5f)
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun StatisticRow(stat: com.example.tippscores.data.model.MatchStatistic) {
-    val colors = LocalAppColors.current
+private fun PossessionCard(
+    stat: com.example.tippscores.data.model.MatchStatistic,
+    homeTeam: String,
+    awayTeam: String,
+    colors: com.example.tippscores.ui.theme.AppColorScheme
+) {
+    val home = stat.home.replace("%", "").trim().toFloatOrNull() ?: 50f
+    val away = stat.away.replace("%", "").trim().toFloatOrNull() ?: 50f
 
-    val homeNumber = stat.home.replace(",", ".").replace("%", "").trim().toFloatOrNull()
-    val awayNumber = stat.away.replace(",", ".").replace("%", "").trim().toFloatOrNull()
-    val total = if (homeNumber != null && awayNumber != null) homeNumber + awayNumber else 0f
-    val homeRatio = if (total > 0f) (homeNumber ?: 0f) / total else 0.5f
-    val awayRatio = if (total > 0f) (awayNumber ?: 0f) / total else 0.5f
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = colors.cardBackground
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Labdabirtoklás",
+                color = colors.secondaryText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(10.dp))
 
-    Column(modifier = Modifier.padding(vertical = 7.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(homeTeam, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(awayTeam, color = colors.primaryText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(home.coerceAtLeast(8f))
+                        .fillMaxHeight()
+                        .background(Color(0xFF2563EB)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("${home.toInt()}%", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(away.coerceAtLeast(8f))
+                        .fillMaxHeight()
+                        .background(Color(0xFFDC2626)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("${away.toInt()}%", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfessionalStatisticRow(
+    stat: com.example.tippscores.data.model.MatchStatistic,
+    colors: com.example.tippscores.ui.theme.AppColorScheme
+) {
+    val homeNum = stat.home.replace(",", ".").replace("%", "").trim().toFloatOrNull()
+    val awayNum = stat.away.replace(",", ".").replace("%", "").trim().toFloatOrNull()
+    val total = (homeNum ?: 0f) + (awayNum ?: 0f)
+    val homeRatio = if (total > 0) (homeNum ?: 0f) / total else 0.5f
+
+    Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 stat.home,
-                color = colors.primaryText,
+                color = if ((homeNum ?: 0f) > (awayNum ?: 0f)) Color(0xFF2563EB) else colors.primaryText,
                 fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                modifier = Modifier.width(46.dp)
+                fontSize = 13.sp,
+                modifier = Modifier.width(48.dp)
             )
             Text(
                 stat.label,
                 color = colors.secondaryText,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f)
             )
             Text(
                 stat.away,
-                color = colors.primaryText,
+                color = if ((awayNum ?: 0f) > (homeNum ?: 0f)) Color(0xFFDC2626) else colors.primaryText,
                 fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 textAlign = TextAlign.End,
-                modifier = Modifier.width(46.dp)
+                modifier = Modifier.width(48.dp)
             )
         }
 
-        if (homeNumber != null && awayNumber != null && total > 0f) {
-            Spacer(Modifier.height(5.dp))
-            Row(
+        if (homeNum != null && awayNum != null && total > 0f) {
+            Spacer(Modifier.height(6.dp))
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(50)),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(colors.divider.copy(alpha = 0.3f))
             ) {
                 Box(
                     modifier = Modifier
-                        .weight(homeRatio.coerceIn(0.05f, 0.95f))
-                        .height(5.dp)
+                        .fillMaxHeight()
+                        .fillMaxWidth(homeRatio)
                         .background(Color(0xFF2563EB))
-                )
-                Spacer(Modifier.width(2.dp))
-                Box(
-                    modifier = Modifier
-                        .weight(awayRatio.coerceIn(0.05f, 0.95f))
-                        .height(5.dp)
-                        .background(Color(0xFF94A3B8))
                 )
             }
         }
     }
 }
 
-@Composable
 private fun EventRow(event: MatchEvent) {
     val colors = LocalAppColors.current
     Surface(
