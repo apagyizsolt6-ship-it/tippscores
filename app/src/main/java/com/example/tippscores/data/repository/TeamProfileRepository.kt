@@ -1,10 +1,7 @@
 package com.example.tippscores.data.repository
 
-import com.example.tippscores.data.model.LeagueStats
-import com.example.tippscores.data.model.TeamFormItem
-import com.example.tippscores.data.model.TeamRecentMatch
-import com.example.tippscores.data.util.JsonX
 import com.example.tippscores.data.model.LeaguePlayerStat
+import com.example.tippscores.data.model.LeagueStats
 import com.example.tippscores.data.model.TeamLeagueRecord
 import com.example.tippscores.data.model.TeamMinuteBucket
 import com.example.tippscores.data.model.TeamProfile
@@ -12,18 +9,12 @@ import com.example.tippscores.data.model.TeamSquadPlayer
 import com.example.tippscores.data.model.TeamTransfer
 import com.example.tippscores.data.model.TeamTrophy
 import com.example.tippscores.data.remote.NetworkModule
+import com.example.tippscores.data.remote.StatpalImages
+import com.example.tippscores.data.util.JsonX
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import kotlinx.coroutines.CancellationException
 
-/**
- * Csapatprofil a StatPal "Get Team" végpontjából
- * (v2/soccer/teams/{team_id}).
- *
- * A végpont csapat-AZONOSÍTÓT vár, ezért a meccslistából érkező
- * homeTeamId / awayTeamId értéket használjuk. Az eredményt 10 percig
- * memóriában tartjuk, hogy a profil újranyitása ne költsön API-hívást.
- */
 class TeamProfileRepository(
     private val statpalKeyProvider: () -> String
 ) {
@@ -40,11 +31,39 @@ class TeamProfileRepository(
 
     private val cache = mutableMapOf<String, CacheEntry>()
     private val leagueCache = mutableMapOf<String, LeagueCacheEntry>()
+    private val resolvedIdByName = mutableMapOf<String, String>()
 
-    suspend fun fetch(teamId: String?, teamName: String): TeamProfile? {
-        val id = teamId?.trim().orEmpty()
+    suspend fun fetch(
+        teamId: String?,
+        teamName: String,
+        leagueIdHint: String? = null
+    ): TeamProfile? {
         val key = statpalKeyProvider().trim()
-        if (id.isEmpty() || key.isEmpty()) return null
+        if (key.isEmpty()) return null
+
+        val normName = JsonX.norm(teamName)
+        var id = teamId?.trim().orEmpty()
+
+        if (id.isEmpty() && normName.isNotEmpty()) {
+            id = resolvedIdByName[normName].orEmpty()
+        }
+
+        if (id.isEmpty() && !leagueIdHint.isNullOrBlank()) {
+            val lStats = fetchLeagueStats(leagueIdHint)
+            val matched = lStats?.players?.firstOrNull {
+                val pTeam = JsonX.norm(it.teamName)
+                pTeam.isNotEmpty() && (pTeam == normName || pTeam.contains(normName) || normName.contains(pTeam)) && !it.teamId.isNullOrBlank()
+            }
+            if (matched?.teamId != null) {
+                id = matched.teamId
+                resolvedIdByName[normName] = id
+            }
+        }
+
+        if (id.isEmpty()) return null
+        if (normName.isNotEmpty()) {
+            resolvedIdByName[normName] = id
+        }
 
         val cached = cache[id]
         if (cached != null &&
@@ -58,7 +77,12 @@ class TeamProfileRepository(
                 url = "https://statpal.io/api/v2/soccer/teams/$id",
                 accessKey = key
             )
-            val profile = parse(root, id, teamName)
+            val parsed = parse(root, id, teamName)
+            val profile = parsed?.copy(
+                logoUrl = parsed.logoUrl.ifBlank {
+                    StatpalImages.team(id).orEmpty()
+                }
+            )
             if (profile != null) {
                 cache[id] = CacheEntry(System.currentTimeMillis(), profile)
             }
@@ -71,11 +95,6 @@ class TeamProfileRepository(
         }
     }
 
-    /**
-     * StatPal "Get League Stats" (v2/soccer/leagues/{league_id}/stats):
-     * a bajnokság összes csapata és keretük játékos-statisztikái egy
-     * hívásban. 30 percig memóriában tartjuk (nagy válasz).
-     */
     suspend fun fetchLeagueStats(leagueId: String?): LeagueStats? {
         val id = leagueId?.trim().orEmpty()
         val key = statpalKeyProvider().trim()
@@ -96,6 +115,13 @@ class TeamProfileRepository(
             val stats = parseLeagueStats(root, id)
             if (stats != null) {
                 leagueCache[id] = LeagueCacheEntry(System.currentTimeMillis(), stats)
+                stats.players.forEach { p ->
+                    val n = JsonX.norm(p.teamName)
+                    val tId = p.teamId
+                    if (n.isNotEmpty() && !tId.isNullOrBlank()) {
+                        resolvedIdByName[n] = tId
+                    }
+                }
             }
             stats
         } catch (e: CancellationException) {
@@ -202,6 +228,7 @@ class TeamProfileRepository(
         return TeamProfile(
             id = team.text("id") ?: id,
             name = team.text("name") ?: fallbackName,
+            logoUrl = StatpalImages.team(team.text("id") ?: id).orEmpty(),
             country = team.text("country"),
             league = records.firstOrNull()?.leagueName,
             founded = team.text("founded"),
@@ -282,8 +309,6 @@ class TeamProfileRepository(
 
     private fun String?.isTruthy(): Boolean =
         this != null && (equals("true", ignoreCase = true) || this == "1")
-
-    // --- Biztonságos JSON segédek (a StatPal néha objektumot ad tömb helyett) ---
 
     private fun JsonElement?.asObj(): JsonObject? =
         if (this != null && this.isJsonObject) this.asJsonObject else null
