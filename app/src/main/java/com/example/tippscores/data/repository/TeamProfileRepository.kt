@@ -163,7 +163,24 @@ class TeamProfileRepository(
                             assists = p.text("assists")?.toIntOrNull() ?: 0,
                             yellowCards = p.text("yellowcards")?.toIntOrNull() ?: 0,
                             redCards = p.text("redcards")?.toIntOrNull() ?: 0,
-                            rating = p.text("rating")?.toDoubleOrNull()?.takeIf { it > 0.0 }
+                            rating = p.text("rating")?.toDoubleOrNull()?.takeIf { it > 0.0 },
+                            age = p.text("age"),
+                            shotsTotal = p.text("shots_total")?.toIntOrNull() ?: 0,
+                            shotsOnTarget = (p.text("shots_on") ?: p.text("shots_on_target"))
+                                ?.toIntOrNull() ?: 0,
+                            keyPasses = p.text("key_passes")?.toIntOrNull() ?: 0,
+                            dribbleAttempts = p.text("dribble_attempts")?.toIntOrNull() ?: 0,
+                            dribbleSuccess = p.text("dribble_success")?.toIntOrNull() ?: 0,
+                            duelsTotal = p.text("duels_total")?.toIntOrNull() ?: 0,
+                            duelsWon = p.text("duels_won")?.toIntOrNull() ?: 0,
+                            tackles = p.text("tackles")?.toIntOrNull() ?: 0,
+                            interceptions = p.text("interceptions")?.toIntOrNull() ?: 0,
+                            clearances = p.text("clearances")?.toIntOrNull() ?: 0,
+                            passAttempts = p.text("pass_attempts")?.toIntOrNull() ?: 0,
+                            passSuccess = p.text("pass_success")?.toIntOrNull() ?: 0,
+                            saves = p.text("saves")?.toIntOrNull() ?: 0,
+                            goalsConceded = p.text("goals_conceded")?.toIntOrNull() ?: 0,
+                            foulsCommitted = p.text("fouls_committed")?.toIntOrNull() ?: 0
                         )
                     }
             }
