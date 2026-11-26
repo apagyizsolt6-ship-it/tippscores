@@ -30,12 +30,15 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.local.AppDatabase
+import com.example.tippscores.data.local.FollowStore
 import com.example.tippscores.data.local.TipStore
 import com.example.tippscores.data.remote.StatpalImages
+import com.example.tippscores.data.repository.PlayerRepository
 import com.example.tippscores.data.repository.PreviewRepository
 import com.example.tippscores.data.repository.StandingsRepository
 import com.example.tippscores.data.util.JsonX
 import com.example.tippscores.ui.screens.LeagueScreen
+import com.example.tippscores.ui.screens.PlayerProfileScreen
 import com.example.tippscores.ui.screens.TipsScreen
 import com.example.tippscores.data.repository.CoachProfileRepository
 import com.example.tippscores.data.repository.MatchRepository
@@ -92,6 +95,16 @@ class MainActivity : ComponentActivity() {
 
     private val tipStore by lazy {
         TipStore(this)
+    }
+
+    private val playerRepository by lazy {
+        PlayerRepository(
+            statpalKeyProvider = { apiPreferences.statpalApiKey }
+        )
+    }
+
+    private val followStore by lazy {
+        FollowStore(this)
     }
 
     private val detailsRepository by lazy {
@@ -257,6 +270,16 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf("")
                 }
 
+            var selectedPlayerId by
+                remember {
+                    mutableStateOf<String?>(null)
+                }
+
+            var selectedPlayerName by
+                remember {
+                    mutableStateOf("")
+                }
+
             var selectedLeagueId by
                 remember {
                     mutableStateOf<String?>(null)
@@ -299,8 +322,10 @@ class MainActivity : ComponentActivity() {
                     val currentTeamName = selectedTeamName
                     val currentCoachId = selectedCoachId
                     val currentLeagueId = selectedLeagueId
+                    val currentPlayerId = selectedPlayerId
 
                     val screenKey = when {
+                        currentPlayerId != null -> "player"
                         currentCoachId != null -> "coach"
                         currentTeamName != null -> "team"
                         currentMatchId != null -> "match"
@@ -317,7 +342,33 @@ class MainActivity : ComponentActivity() {
                         label = "screenTransition"
                     ) { key ->
 
-                    if (key == "coach" && currentCoachId != null) {
+                    if (key == "player" && currentPlayerId != null) {
+
+                        PlayerProfileScreen(
+                            playerId = currentPlayerId,
+                            playerName = selectedPlayerName,
+                            playerRepository = playerRepository,
+                            teamRepository = teamProfileRepository,
+                            followStore = followStore,
+                            onBack = {
+                                selectedPlayerId = null
+                                selectedPlayerName = ""
+                            },
+                            onPlayerClick = { otherId, otherName ->
+                                selectedPlayerId = otherId
+                                selectedPlayerName = otherName
+                            },
+                            onTeamClick = { teamId, teamName ->
+                                selectedPlayerId = null
+                                selectedPlayerName = ""
+                                selectedTeamId = teamId
+                                selectedTeamName = teamName
+                                selectedTeamLogo = ""
+                                selectedTeamLeagueId = null
+                            }
+                        )
+
+                    } else if (key == "coach" && currentCoachId != null) {
 
                         CoachProfileScreen(
                             coachId = currentCoachId,
@@ -338,6 +389,10 @@ class MainActivity : ComponentActivity() {
                             repository = teamProfileRepository,
                             standingsRepository = standingsRepository,
                             leagueIdHint = selectedTeamLeagueId,
+                            onPlayerClick = { playerId, playerName ->
+                                selectedPlayerId = playerId
+                                selectedPlayerName = playerName
+                            },
                             onCoachClick = { coachId, coachName ->
                                 selectedCoachId = coachId
                                 selectedCoachName = coachName
@@ -398,6 +453,13 @@ class MainActivity : ComponentActivity() {
 
                             tipStore = tipStore,
 
+                            teamRepository = teamProfileRepository,
+
+                            onOpenPlayerProfile = { playerId, playerName ->
+                                selectedPlayerId = playerId
+                                selectedPlayerName = playerName
+                            },
+
                             onTeamClick = { teamName, logoUrl ->
                                 val openMatch = matches.find { it.id == currentMatchId }
                                 val normTarget = JsonX.norm(teamName)
@@ -440,6 +502,10 @@ class MainActivity : ComponentActivity() {
                                 matches.find { it.id == matchId }?.let {
                                     viewModel.openMatchDetails(it)
                                 }
+                            },
+                            onPlayerClick = { playerId, playerName ->
+                                selectedPlayerId = playerId
+                                selectedPlayerName = playerName
                             },
                             onBack = {
                                 selectedLeagueId = null
