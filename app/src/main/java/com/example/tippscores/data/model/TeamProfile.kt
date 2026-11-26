@@ -116,7 +116,23 @@ data class LeaguePlayerStat(
     val assists: Int = 0,
     val yellowCards: Int = 0,
     val redCards: Int = 0,
-    val rating: Double? = null
+    val rating: Double? = null,
+    val age: String? = null,
+    val shotsTotal: Int = 0,
+    val shotsOnTarget: Int = 0,
+    val keyPasses: Int = 0,
+    val dribbleAttempts: Int = 0,
+    val dribbleSuccess: Int = 0,
+    val duelsTotal: Int = 0,
+    val duelsWon: Int = 0,
+    val tackles: Int = 0,
+    val interceptions: Int = 0,
+    val clearances: Int = 0,
+    val passAttempts: Int = 0,
+    val passSuccess: Int = 0,
+    val saves: Int = 0,
+    val goalsConceded: Int = 0,
+    val foulsCommitted: Int = 0
 )
 
 data class LeagueStats(
