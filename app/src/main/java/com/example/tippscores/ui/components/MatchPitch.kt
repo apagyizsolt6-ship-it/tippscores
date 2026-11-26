@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tippscores.data.model.LeaguePlayerStat
 import com.example.tippscores.data.model.LineupPlayer
 import com.example.tippscores.data.model.MatchEvent
 import com.example.tippscores.data.model.MatchLineup
@@ -78,11 +80,26 @@ fun FullPitchLineupCard(
     away: MatchLineup,
     events: List<MatchEvent>,
     onPlayerClick: (LineupPlayer, String) -> Unit,
-    onCoachClick: (String, String) -> Unit
+    onCoachClick: (String, String) -> Unit,
+    playerStats: Map<String, LeaguePlayerStat> = emptyMap()
 ) {
     val colors = LocalAppColors.current
 
     var showHeatMap by remember { mutableStateOf(false) }
+
+    // 0 = név, 1 = értékelés, 2 = gól, 3 = gólpassz, 4 = kor (szezonadat a bajnokságból)
+    var overlayMode by remember { mutableIntStateOf(0) }
+
+    val overlayText: (LineupPlayer) -> String? = { player ->
+        val stat = player.id?.let { playerStats[it] }
+        when (overlayMode) {
+            1 -> stat?.rating?.let { String.format(Locale.US, "%.1f", it) }
+            2 -> stat?.goals?.let { "$it gól" }
+            3 -> stat?.assists?.let { "$it assz." }
+            4 -> stat?.age?.takeIf { it.isNotBlank() }?.let { "$it év" }
+            else -> null
+        }
+    }
     var selectedPlayerState by remember { mutableStateOf<Triple<LineupPlayer, String, PlayerBadges>?>(null) }
 
     val homeRows = remember(home) { buildRows(home) }
@@ -97,6 +114,7 @@ fun FullPitchLineupCard(
             teamName = teamName,
             badges = badges,
             colors = colors,
+            seasonStat = player.id?.let { playerStats[it] },
             onDismiss = { selectedPlayerState = null },
             onOpenFullProfile = {
                 selectedPlayerState = null
@@ -163,12 +181,27 @@ fun FullPitchLineupCard(
                 }
             }
 
+            if (playerStats.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Név", "Ért.", "Gól", "Assz.", "Kor").forEachIndexed { index, label ->
+                        FilterChip(
+                            selected = overlayMode == index,
+                            onClick = { overlayMode = index },
+                            label = { Text(label, fontSize = 10.sp) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                LineupSummaryStrip(homeTeam, awayTeam, home, away, playerStats, colors)
+            }
+
             Spacer(Modifier.height(10.dp))
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.54f)
+                    .aspectRatio(if (overlayMode != 0) 0.46f else 0.54f)
                     .clip(RoundedCornerShape(14.dp))
             ) {
                 PitchBackground()
@@ -188,6 +221,7 @@ fun FullPitchLineupCard(
                         baseColor = HomeColor,
                         badges = homeBadges,
                         emptyText = "$homeTeam: nincs kezdőcsapat",
+                        overlayText = overlayText,
                         onPlayerClick = { p ->
                             selectedPlayerState = Triple(p, homeTeam, homeBadges[p] ?: PlayerBadges())
                         },
@@ -199,6 +233,7 @@ fun FullPitchLineupCard(
                         baseColor = AwayColor,
                         badges = awayBadges,
                         emptyText = "$awayTeam: nincs kezdőcsapat",
+                        overlayText = overlayText,
                         onPlayerClick = { p ->
                             selectedPlayerState = Triple(p, awayTeam, awayBadges[p] ?: PlayerBadges())
                         },
@@ -234,6 +269,7 @@ private fun PlayerQuickMatchSheet(
     teamName: String,
     badges: PlayerBadges,
     colors: AppColorScheme,
+    seasonStat: LeaguePlayerStat? = null,
     onDismiss: () -> Unit,
     onOpenFullProfile: () -> Unit
 ) {
@@ -298,6 +334,28 @@ private fun PlayerQuickMatchSheet(
                 QuickStatPill("🟨 Sárga", "${badges.yellow}", colors)
                 QuickStatPill("🟥 Piros", "${badges.red}", colors)
                 QuickStatPill("⏱ Csere", badges.subMinute?.let { "$it'" } ?: "–", colors)
+            }
+
+            if (seasonStat != null) {
+                HorizontalDivider(color = colors.divider)
+                Text(
+                    "Szezon a bajnokságban",
+                    color = colors.tertiaryText,
+                    fontSize = 10.sp
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    QuickStatPill("Mérkőzés", "${seasonStat.appearances}", colors)
+                    QuickStatPill("Gól", "${seasonStat.goals}", colors)
+                    QuickStatPill("Gólpassz", "${seasonStat.assists}", colors)
+                    QuickStatPill(
+                        "Átl. értékelés",
+                        seasonStat.rating?.let { String.format(Locale.US, "%.2f", it) } ?: "–",
+                        colors
+                    )
+                }
             }
 
             Button(
@@ -584,6 +642,7 @@ private fun PitchHalf(
     badges: Map<LineupPlayer, PlayerBadges>,
     emptyText: String,
     onPlayerClick: (LineupPlayer) -> Unit,
+    overlayText: (LineupPlayer) -> String? = { null },
     modifier: Modifier = Modifier
 ) {
     if (rows.isEmpty()) {
@@ -615,6 +674,7 @@ private fun PitchHalf(
                         player = player,
                         baseColor = baseColor,
                         badges = badges[player] ?: PlayerBadges(),
+                        overlayText = overlayText(player),
                         onClick = { onPlayerClick(player) }
                     )
                 }
@@ -628,6 +688,7 @@ private fun PitchMarker(
     player: LineupPlayer,
     baseColor: Color,
     badges: PlayerBadges,
+    overlayText: String? = null,
     onClick: () -> Unit
 ) {
     val isKeeper = roleOf(player.position) == 0
@@ -738,6 +799,87 @@ private fun PitchMarker(
                 .background(Color(0x99000000), RoundedCornerShape(4.dp))
                 .padding(horizontal = 4.dp, vertical = 1.dp)
         )
+
+        if (!overlayText.isNullOrBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = overlayText,
+                color = Color(0xFF0F172A),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                modifier = Modifier
+                    .background(Color(0xFFFBBF24), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
+            )
+        }
+    }
+}
+
+/** Mindkét kezdőcsapat szezonadatainak összesítése (átlagértékelés, gólok, gólpasszok, átlagéletkor). */
+@Composable
+private fun LineupSummaryStrip(
+    homeTeam: String,
+    awayTeam: String,
+    home: MatchLineup,
+    away: MatchLineup,
+    playerStats: Map<String, LeaguePlayerStat>,
+    colors: AppColorScheme
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SummaryColumn(homeTeam, home, HomeColor, playerStats, colors, Modifier.weight(1f))
+        SummaryColumn(awayTeam, away, AwayColor, playerStats, colors, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun SummaryColumn(
+    teamName: String,
+    lineup: MatchLineup,
+    teamColor: Color,
+    playerStats: Map<String, LeaguePlayerStat>,
+    colors: AppColorScheme,
+    modifier: Modifier = Modifier
+) {
+    val stats = lineup.startingPlayers.mapNotNull { player -> player.id?.let { playerStats[it] } }
+
+    val rating = stats.mapNotNull { it.rating }.takeIf { it.isNotEmpty() }?.average()
+    val age = stats.mapNotNull { it.age?.toIntOrNull() }.takeIf { it.isNotEmpty() }?.average()
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = teamColor.copy(alpha = 0.10f)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(
+                teamName,
+                color = teamColor,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Átl. értékelés: " + (rating?.let { String.format(Locale.US, "%.2f", it) } ?: "–"),
+                color = colors.secondaryText,
+                fontSize = 10.sp
+            )
+            Text(
+                "Gól / gólpassz: ${stats.sumOf { it.goals }} / ${stats.sumOf { it.assists }}",
+                color = colors.secondaryText,
+                fontSize = 10.sp
+            )
+            Text(
+                "Átl. életkor: " + (age?.let { String.format(Locale.US, "%.1f", it) } ?: "–"),
+                color = colors.secondaryText,
+                fontSize = 10.sp
+            )
+        }
     }
 }
 
