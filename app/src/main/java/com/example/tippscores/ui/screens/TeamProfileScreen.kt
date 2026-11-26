@@ -71,7 +71,8 @@ fun TeamProfileScreen(
     onBack: () -> Unit,
     onCoachClick: (String, String) -> Unit = { _, _ -> },
     standingsRepository: StandingsRepository? = null,
-    leagueIdHint: String? = null
+    leagueIdHint: String? = null,
+    onPlayerClick: (String, String) -> Unit = { _, _ -> }
 ) {
     val colors = LocalAppColors.current
     var profile by remember(teamId, teamName, leagueIdHint) { mutableStateOf<TeamProfile?>(null) }
@@ -246,6 +247,7 @@ fun TeamProfileScreen(
                             leagueStats = leagueStats,
                             sortMode = squadSortMode,
                             onSortChange = { squadSortMode = it },
+                            onPlayerClick = onPlayerClick,
                             colors = colors
                         )
                     }
@@ -453,6 +455,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.squadAndTransfersSect
     leagueStats: LeagueStats?,
     sortMode: Int,
     onSortChange: (Int) -> Unit,
+    onPlayerClick: (String, String) -> Unit,
     colors: AppColorScheme
 ) {
     if (p.squad.isNotEmpty()) {
@@ -485,7 +488,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.squadAndTransfersSect
                             Spacer(Modifier.height(6.dp))
                             Text(group, color = colors.secondaryText, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             players.forEach { player ->
-                                SquadRow(player, statsByPlayerId[player.id], colors)
+                                SquadRow(player, statsByPlayerId[player.id], colors) {
+                                    player.id?.let { id -> onPlayerClick(id, player.name) }
+                                }
                             }
                         }
                     }
@@ -496,7 +501,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.squadAndTransfersSect
                         else -> p.squad.sortedByDescending { statsByPlayerId[it.id]?.rating ?: -1.0 }
                     }
                     sorted.forEach { player ->
-                        SquadRow(player, statsByPlayerId[player.id], colors)
+                        SquadRow(player, statsByPlayerId[player.id], colors) {
+                            player.id?.let { id -> onPlayerClick(id, player.name) }
+                        }
                     }
                 }
             }
@@ -704,11 +711,13 @@ private fun MinuteBars(
 private fun SquadRow(
     player: TeamSquadPlayer,
     stat: LeaguePlayerStat?,
-    colors: AppColorScheme
+    colors: AppColorScheme,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickableCompat(onClick)
             .padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

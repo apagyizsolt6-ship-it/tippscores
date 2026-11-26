@@ -63,7 +63,8 @@ fun LeagueScreen(
     teamRepository: TeamProfileRepository,
     leagueMatches: List<Match>,
     onMatchClick: (String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onPlayerClick: (String, String) -> Unit = { _, _ -> }
 ) {
     val colors = LocalAppColors.current
 
@@ -214,7 +215,12 @@ fun LeagueScreen(
                                             rank = indexed.index + 1,
                                             player = indexed.value,
                                             value = if (goals) indexed.value.goals else indexed.value.assists,
-                                            colors = colors
+                                            colors = colors,
+                                            onClick = {
+                                                indexed.value.playerId?.let { id ->
+                                                    onPlayerClick(id, indexed.value.name)
+                                                }
+                                            }
                                         )
                                     }
                                 }
@@ -383,10 +389,13 @@ private fun PlayerRankRow(
     rank: Int,
     player: LeaguePlayerStat,
     value: Int,
-    colors: AppColorScheme
+    colors: AppColorScheme,
+    onClick: () -> Unit = {}
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         color = colors.cardBackground
     ) {

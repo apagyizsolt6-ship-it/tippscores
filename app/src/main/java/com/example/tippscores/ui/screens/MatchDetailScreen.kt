@@ -71,6 +71,8 @@ import com.example.tippscores.data.model.MatchLineup
 import com.example.tippscores.data.model.PlayerProfile
 import com.example.tippscores.data.repository.MatchDetailsRepository
 import com.example.tippscores.data.local.Tip
+import com.example.tippscores.data.model.LeaguePlayerStat
+import com.example.tippscores.data.repository.TeamProfileRepository
 import com.example.tippscores.data.local.TipStore
 import com.example.tippscores.data.model.MatchPreview
 import com.example.tippscores.data.repository.PreviewRepository
@@ -98,10 +100,32 @@ fun MatchDetailScreen(
     onCoachClick: (String, String) -> Unit = { _, _ -> },
     previewRepository: PreviewRepository? = null,
     tipStore: TipStore? = null,
-    onTipsChanged: () -> Unit = {}
+    onTipsChanged: () -> Unit = {},
+    teamRepository: TeamProfileRepository? = null,
+    onOpenPlayerProfile: (String, String) -> Unit = { _, _ -> }
 ) {
     val colors = LocalAppColors.current
     var selectedTab by remember { mutableIntStateOf(0) }
+
+    // A kezdőcsapat-pálya szezonstatisztikái (a bajnoki statisztikából, játékos-azonosító szerint).
+    var pitchStats by remember(match?.id) {
+        mutableStateOf<Map<String, LeaguePlayerStat>>(emptyMap())
+    }
+
+    LaunchedEffect(match?.id, selectedTab) {
+        val leagueId = match?.leagueId
+        if (selectedTab == 2 && teamRepository != null && !leagueId.isNullOrBlank() && pitchStats.isEmpty()) {
+            pitchStats = try {
+                teamRepository.fetchLeagueStats(leagueId)
+                    ?.players
+                    .orEmpty()
+                    .filter { !it.playerId.isNullOrBlank() }
+                    .associateBy { it.playerId!! }
+            } catch (e: Exception) {
+                emptyMap()
+            }
+        }
+    }
 
     // "Előzetes" fül: sztorik, modell-tipp, szorzók, időjárás (csak megnyitáskor töltődik).
     var preview by remember(match?.id) { mutableStateOf<MatchPreview?>(null) }
@@ -399,10 +423,17 @@ fun MatchDetailScreen(
                                     away = awayLineup,
                                     events = details?.events.orEmpty(),
                                     onPlayerClick = { player, teamName ->
-                                        selectedPlayer = player
-                                        selectedPlayerTeam = teamName
+                                        val playerId = player.id
+                                        if (!playerId.isNullOrBlank()) {
+                                            // Teljes képernyős játékosprofil
+                                            onOpenPlayerProfile(playerId, player.name)
+                                        } else {
+                                            selectedPlayer = player
+                                            selectedPlayerTeam = teamName
+                                        }
                                     },
-                                    onCoachClick = onCoachClick
+                                    onCoachClick = onCoachClick,
+                                    playerStats = pitchStats
                                 )
                             }
                         } else if (details?.hasLineups == true) {
