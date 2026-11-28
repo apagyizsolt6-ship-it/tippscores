@@ -180,6 +180,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        viewModel.setAppInForeground(true)
+    }
+
+    override fun onStop() {
+        viewModel.setAppInForeground(false)
+        super.onStop()
+    }
+
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
@@ -219,6 +229,12 @@ class MainActivity : ComponentActivity() {
 
             val detailsError by
                 viewModel.detailsError.collectAsState()
+
+            val detailsUpdatedAt by
+                viewModel.detailsUpdatedAt.collectAsState()
+
+            val detailsRefreshing by
+                viewModel.detailsRefreshing.collectAsState()
 
             val featuredAdditions by
                 viewModel.featuredAdditions.collectAsState()
@@ -426,6 +442,14 @@ class MainActivity : ComponentActivity() {
 
                             onRetryDetails = {
                                 viewModel.retryMatchDetails()
+                            },
+
+                            detailsUpdatedAt = detailsUpdatedAt,
+
+                            detailsRefreshing = detailsRefreshing,
+
+                            onRefreshNow = {
+                                viewModel.refreshMatchDetailsNow()
                             },
 
                             favoriteTeamNames =
