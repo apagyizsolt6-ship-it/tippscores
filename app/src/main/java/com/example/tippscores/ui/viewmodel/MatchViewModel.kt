@@ -2,6 +2,7 @@ package com.example.tippscores.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.tippscores.data.local.TipStore
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.model.Match
 import com.example.tippscores.data.model.MatchDetails
@@ -15,6 +16,10 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MatchViewModel(
@@ -202,6 +207,95 @@ class MatchViewModel(
     val detailsError: StateFlow<String?> =
         _detailsError
 
+    // --- Automatikus (15 mp-es) frissítés a megnyitott meccsnél ---
+
+    private var detailsRefreshJob: Job? = null
+
+    private var appInForeground = true
+
+    private val _detailsUpdatedAt = MutableStateFlow<Long?>(null)
+
+    val detailsUpdatedAt: StateFlow<Long?> =
+        _detailsUpdatedAt
+
+    private val _detailsRefreshing = MutableStateFlow(false)
+
+    val detailsRefreshing: StateFlow<Boolean> =
+        _detailsRefreshing
+
+    /** Háttérben az app nem frissít (spórol az akkumulátorral és az API-kerettel). */
+    fun setAppInForeground(value: Boolean) {
+        appInForeground = value
+    }
+
+    fun refreshMatchDetailsNow() {
+        viewModelScope.launch {
+            silentRefreshDetails()
+        }
+    }
+
+    private suspend fun silentRefreshDetails() {
+        val id = openedMatchId ?: return
+        if (_detailsRefreshing.value) return
+
+        val match = matches.value.find { it.id == id } ?: return
+
+        _detailsRefreshing.value = true
+        try {
+            // Az élő eredmény és állapot frissítése a lista törlése nélkül.
+            if (!TipStore.isFinishedStatus(match.status)) {
+                repository.refreshLiveScores()
+            }
+
+            val fresh = detailsRepository.fetch(
+                matchId = match.id,
+                homeTeam = match.homeTeam,
+                awayTeam = match.awayTeam,
+                homeTeamId = match.homeTeamId,
+                awayTeamId = match.awayTeamId
+            )
+
+            if (openedMatchId == id) {
+                _matchDetails.value = fresh
+                _detailsUpdatedAt.value = System.currentTimeMillis()
+                _detailsError.value = null
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Hiba esetén a korábbi adat marad látható.
+            e.printStackTrace()
+        } finally {
+            _detailsRefreshing.value = false
+        }
+    }
+
+    private fun startDetailsAutoRefresh() {
+        detailsRefreshJob?.cancel()
+
+        detailsRefreshJob = viewModelScope.launch {
+            var tick = 0
+
+            while (isActive) {
+                delay(DETAILS_REFRESH_MS)
+                tick++
+
+                val id = openedMatchId ?: break
+
+                if (!appInForeground || _detailsLoading.value) continue
+
+                val match = matches.value.find { it.id == id } ?: continue
+
+                if (TipStore.isFinishedStatus(match.status)) continue
+
+                // Élő meccsnél 15 mp-enként, még nem kezdődött meccsnél 60 mp-enként.
+                if (match.isLive || tick % 4 == 0) {
+                    silentRefreshDetails()
+                }
+            }
+        }
+    }
+
     private var openedMatchId: String? = null
 
     fun openMatchDetails(match: Match) {
@@ -221,6 +315,7 @@ class MatchViewModel(
                     homeTeamId = match.homeTeamId,
                     awayTeamId = match.awayTeamId
                 )
+                _detailsUpdatedAt.value = System.currentTimeMillis()
             } catch (e: Exception) {
                 e.printStackTrace()
                 _detailsError.value =
@@ -229,6 +324,8 @@ class MatchViewModel(
                 _detailsLoading.value = false
             }
         }
+
+        startDetailsAutoRefresh()
     }
 
     fun retryMatchDetails() {
@@ -239,6 +336,11 @@ class MatchViewModel(
     }
 
     fun clearMatchDetails() {
+        detailsRefreshJob?.cancel()
+        detailsRefreshJob = null
+        _detailsUpdatedAt.value = null
+        _detailsRefreshing.value = false
+
         openedMatchId = null
         _matchDetails.value = null
         _detailsError.value = null
@@ -373,3 +475,5 @@ class MatchViewModel(
         refreshData()
     }
 }
+
+private const val DETAILS_REFRESH_MS = 15_000L
