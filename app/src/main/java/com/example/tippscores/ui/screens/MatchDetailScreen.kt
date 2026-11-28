@@ -78,6 +78,8 @@ import com.example.tippscores.data.model.MatchPreview
 import com.example.tippscores.data.repository.PreviewRepository
 import com.example.tippscores.ui.components.EventTimeline
 import com.example.tippscores.ui.components.FullPitchLineupCard
+import com.example.tippscores.ui.components.LiveRefreshBar
+import com.example.tippscores.ui.components.LiveStatisticsSection
 import com.example.tippscores.ui.components.PreviewSection
 import com.example.tippscores.ui.components.rememberHu
 import com.example.tippscores.ui.components.TipSection
@@ -102,7 +104,10 @@ fun MatchDetailScreen(
     tipStore: TipStore? = null,
     onTipsChanged: () -> Unit = {},
     teamRepository: TeamProfileRepository? = null,
-    onOpenPlayerProfile: (String, String) -> Unit = { _, _ -> }
+    onOpenPlayerProfile: (String, String) -> Unit = { _, _ -> },
+    detailsUpdatedAt: Long? = null,
+    detailsRefreshing: Boolean = false,
+    onRefreshNow: () -> Unit = {}
 ) {
     val colors = LocalAppColors.current
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -381,14 +386,35 @@ fun MatchDetailScreen(
                     }
                 }
             } else {
+                // Automatikus frissítés állapotsáv (statisztika, események, összeállítás fülön).
+                if (selectedTab <= 2 && !TipStore.isFinishedStatus(match.status)) {
+                    item {
+                        LiveRefreshBar(
+                            isLive = match.isLive,
+                            intervalSeconds = if (match.isLive) 15 else 60,
+                            updatedAt = detailsUpdatedAt,
+                            refreshing = detailsRefreshing,
+                            onRefresh = onRefreshNow
+                        )
+                    }
+                }
+
                 when (selectedTab) {
                     0 -> {
                         item {
-                            StatisticsSection(
-                                details = details,
-                                homeTeam = match.homeTeam,
-                                awayTeam = match.awayTeam
-                            )
+                            if (details?.statistics.isNullOrEmpty()) {
+                                StatisticsSection(
+                                    details = details,
+                                    homeTeam = match.homeTeam,
+                                    awayTeam = match.awayTeam
+                                )
+                            } else {
+                                LiveStatisticsSection(
+                                    stats = details?.statistics.orEmpty(),
+                                    homeTeam = match.homeTeam,
+                                    awayTeam = match.awayTeam
+                                )
+                            }
                         }
                     }
 
