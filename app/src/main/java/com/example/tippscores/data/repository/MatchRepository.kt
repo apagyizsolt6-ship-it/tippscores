@@ -3,6 +3,7 @@ package com.example.tippscores.data.repository
 import com.example.tippscores.data.local.ApiPreferences
 import com.example.tippscores.data.local.MatchDao
 import com.example.tippscores.data.local.MatchEntity
+import com.example.tippscores.data.local.TipStore
 import com.example.tippscores.data.local.toMatch
 import com.example.tippscores.data.localization.CountryLocalizer
 import com.example.tippscores.data.localization.FeaturedLeagues
@@ -11,6 +12,7 @@ import com.example.tippscores.data.model.Match
 import com.example.tippscores.data.remote.NetworkModule
 import com.example.tippscores.data.remote.StatpalLeagueItem
 import com.example.tippscores.data.remote.StatpalMatchItem
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import retrofit2.HttpException
@@ -159,6 +161,47 @@ class MatchRepository(
             matchDao.clearMatches()
 
             throw e
+        }
+    }
+
+    // ========================================================
+    // ÉLŐ EREDMÉNYEK FRISSÍTÉSE A LISTA TÖRLÉSE NÉLKÜL
+    // ========================================================
+
+    /**
+     * A megnyitott meccs 15 másodperces automatikus frissítéséhez: az élő
+     * mérkőzések új állását beírja az adatbázisba (azonos azonosító alapján
+     * felülírja a sort), de a napi listát NEM törli, így nem villog a lista.
+     */
+    suspend fun refreshLiveScores(): Boolean {
+        val statpalKey = apiPreferences.statpalApiKey.trim()
+        if (statpalKey.isEmpty()) return false
+
+        return try {
+            val previousById = snapshotPreviousMatches()
+
+            val response = NetworkModule.statpalApi.getLiveMatches(statpalKey)
+
+            val entities = buildEntities(
+                leagues = response.data?.leagues.orEmpty(),
+                offsetDays = 0,
+                forceLive = true,
+                previousById = previousById,
+                teamLogos = emptyMap()
+            ).map { entity ->
+                // A live feedben megjelenő, már lefutott meccs ne legyen "élő".
+                if (TipStore.isFinishedStatus(entity.status)) entity.copy(isLive = false) else entity
+            }
+
+            if (entities.isNotEmpty()) {
+                matchDao.insertMatches(entities)
+            }
+            entities.isNotEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 
